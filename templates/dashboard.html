@@ -1,0 +1,20 @@
+// {% extends "base.html" %}
+{% block content %}
+<div class="dashboard-container">
+    <div class="welcome-card">
+        <h1>Welcome, {{ current_user.username }}!</h1>
+        <p>Upload your chat .txt file to create a personalized bot that mimics your friend's style.</p>
+    </div>
+    <div class="upload-card">
+        <h2>Upload Chat File</h2>
+        <p>Supported format: WhatsApp export or simple "Name: Message" lines.</p>
+        <form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data" id="upload-form">
+            <div class="input-group file-input">
+                <input type="file" name="file" accept=".txt" required>
+                <label>Choose .txt file</label>
+            </div>
+            <button type="submit" class="btn btn-primary">Upload & Analyze</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

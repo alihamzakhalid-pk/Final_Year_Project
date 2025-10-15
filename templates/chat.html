@@ -1,0 +1,14 @@
+// {% extends "base.html" %}
+{% block content %}
+<div class="chat-container full-page-chat" data-chat-id="{{ chat_id }}">
+    <div class="chat-header">
+        <h1>Chat with {{ person }} Bot</h1>
+        <p>Powered by your chat history. Start talking!</p>
+    </div>
+    <div id="chat-messages" class="chat-messages"></div>
+    <div class="chat-input-container">
+        <input type="text" id="message-input" placeholder="Type your message..." maxlength="500">
+        <button id="send-btn" onclick="sendMessage({{ chat_id }})">Send</button>
+    </div>
+</div>
+{% endblock %}

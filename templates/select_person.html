@@ -1,0 +1,24 @@
+// {% extends "base.html" %}
+{% block content %}
+<div class="select-container">
+    <div class="select-card">
+        <h1>Select Person to Emulate</h1>
+        <p>Choose whose chat style you'd like the bot to replicate. Based on your uploaded file:</p>
+        <form method="POST" action="{{ url_for('select_person', chat_id=chat_id) }}" id="select-form">
+            <input type="hidden" name="chat_id" value="{{ chat_id }}">
+            <div class="participants-grid">
+                {% for participant in participants %}
+                    <label class="participant-card">
+                        <input type="radio" name="person" value="{{ participant.name }}" required>
+                        <div class="participant-info">
+                            <h3>{{ participant.name }}</h3>
+                            <p>{{ participant.count }} messages analyzed</p>
+                        </div>
+                    </label>
+                {% endfor %}
+            </div>
+            <button type="submit" class="btn btn-primary">Create Bot</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+# Environment variables
+.env
+
+# Virtual environment
+venv/
+BotMe1/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Database file
+botme.db
+
+# macOS folder attributes
+.DS_Store
+
+new.txt
