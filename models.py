@@ -34,3 +34,19 @@ class ChatData(db.Model):
  
     def __repr__(self):
         return f'<ChatData {self.id} for User {self.user_id}, Temp: {self.is_temp}>'
+
+class VerificationCode(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(150), nullable=False, index=True)
+    code = db.Column(db.String(6), nullable=False)
+    purpose = db.Column(db.String(20), nullable=False)  # 'signup' or 'login'
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # For signup, store user data temporarily
+    temp_data = db.Column(db.Text, nullable=True)  # JSON string with fullName, password, etc.
+    
+    def is_expired(self):
+        return datetime.utcnow() > self.expires_at
+    
+    def __repr__(self):
+        return f'<VerificationCode {self.code} for {self.email} ({self.purpose})>'
