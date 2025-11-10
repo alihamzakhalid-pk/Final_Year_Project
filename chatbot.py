@@ -1,133 +1,142 @@
-from langchain_openai import ChatOpenAI
-# from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import PromptTemplate
-from langchain.chains import ConversationChain
-from langchain.memory import ConversationBufferMemory
 import json
-import random  # For sampling examples if needed
+import random
 from config import Config
-from models import ChatData, db  # Import for DB access to update history
+from models import ChatData, db  
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_community.chat_message_histories import ChatMessageHistory
 
-# Initialize LLM (fix: use gpt-4o; set your API key in config.py)
-llm = ChatOpenAI(model="gpt-4o", temperature=0.7, openai_api_key=Config.OPENAI_API_KEY)
+# ✅ Lazily initialize the OpenAI Chat Model to avoid startup crashes when API key is missing
+_llm = None
 
-"""llm = ChatGoogleGenerativeAI(
-    model="gemini-1.0-pro", 
-    temperature=0.7, 
-    google_api_key=Config.GOOGLE_API_KEY
-)
-"""
+def get_llm():
+    global _llm
+    if _llm is not None:
+        return _llm
+    api_key = Config.OPENAI_API_KEY
+    if not api_key:
+        # Delay error until chat usage, return a dummy that raises when used
+        raise RuntimeError("OPENAI_API_KEY is not set. Please configure it in environment.")
+    _llm = ChatOpenAI(
+        model="gpt-4o",
+        temperature=0.7,
+        openai_api_key=api_key,
+    )
+    return _llm
 
+# ✅ Function to create the chatbot's personality prompt
 def create_chatbot_prompt(selected_person, person_msgs):
     """
     Create a high-quality prompt to emulate a person's personality, tone, and style in Roman Urdu.
-    person_msgs: list of str (person's messages for examples)
-    Limit to 100 examples to avoid token limits; sample if more for diversity.
     """
-    # Use up to 100 examples: random sample for better coverage of "whole" style
-    # if len(person_msgs) > 500:
-    #     person_msgs_sample = random.sample(person_msgs, 500)
-    # else:
-    #     person_msgs_sample = person_msgs[:500]
-    person_msgs_sample=person_msgs[::]
-    
-    # Format examples as "Person's response: {msg}" for clarity
-    examples = "\n".join([f"{selected_person}'s response: {msg}" for msg in person_msgs_sample])
+    person_msgs_sample = person_msgs[::]
 
-    template = f"""
-    You are a chatbot designed to perfectly emulate the personality, tone, humor, and style of {selected_person} 
-    based on their chat history written in Roman Urdu.
+    examples = "\n".join([
+        f"{selected_person}'s response: {msg}"
+        for msg in person_msgs_sample
+    ])
 
-    Study these examples carefully to capture their unique manner of speaking, casual phrasing, slang, and emotional tone:
+    # Create structured chat prompt
+    prompt = ChatPromptTemplate.from_messages([
+        (
+            "system",
+            f"""You are a chatbot designed to perfectly emulate the personality, tone, humor, and style of {selected_person}
+based on their chat history written in Roman Urdu.
 
-    {examples}
+Study these examples carefully to capture their unique manner of speaking, casual phrasing, slang, and emotional tone:
 
-    Memory of past conversation: {{history}}
+{examples}
 
-    Instructions for behavior:
-    - Always respond in the style of {selected_person} in Roman Urdu.
-    - Use casual, friendly, and natural language; include local slang, short forms, and emojis as seen in their messages.
-    - Match their vocabulary, sentence structure, humor, and emotional tone.
-    - Maintain continuity across messages; remember context from {{history}}.
-    - Responses should be concise, engaging, and under 100 words.
-    - Never break character, switch to English fully, or reference being a chatbot.
-
-    Human: {{input}}
-    {selected_person}:
-    """
-    # Note: End with "{selected_person}:" to prompt the model to respond in character
-
-    prompt = PromptTemplate(input_variables=["input", "history"], template=template)
+Instructions for behavior:
+- Always respond in the style of {selected_person} in Roman Urdu.
+- Use casual, friendly, and natural language; include local slang, short forms, and emojis as seen in their messages.
+- Match their vocabulary, sentence structure, humor, and emotional tone.
+- Maintain continuity across messages; remember context from previous conversation.
+- Responses should be concise, engaging, and under 100 words.
+- Never break character, switch to English fully, or reference being a chatbot."""
+        ),
+        MessagesPlaceholder(variable_name="history"),
+        ("human", "{input}")
+    ])
     return prompt
 
+
+# ✅ Function to get chatbot response
 def get_chatbot_response(chat_data_id, user_input):
     """
-    Generate response using stored chat data.
-    Loads example messages (list of str) and persistent history (list of dicts) from DB.
-    Updates history in DB after response.
+    Generate response using stored chat data (LangChain 1.0+ compatible).
     """
     chat_data = ChatData.query.get(chat_data_id)
     if not chat_data:
         return "Error: Chat data not found."
-    
+
     selected_person = chat_data.selected_person
     if not selected_person:
         return "Error: No person selected for this chat."
-    
-    # Load person's example messages (JSON string -> list of str)
+
+    # Load person's example messages
     try:
         person_msgs = json.loads(chat_data.messages)
     except (json.JSONDecodeError, TypeError):
         person_msgs = []
-    
+
     if not person_msgs:
         return f"Error: No example messages found for {selected_person}. Please upload a valid chat."
-    
-    # Load persistent conversation history from DB (JSON string -> list of dicts)
+
+    # Load conversation history
     try:
-        history = json.loads(chat_data.conversation_history)
+        history_data = json.loads(chat_data.conversation_history)
     except (json.JSONDecodeError, TypeError):
-        history = []
-    
+        history_data = []
+
     try:
         prompt = create_chatbot_prompt(selected_person, person_msgs)
-        
-        # Create memory and inject existing history
-        memory = ConversationBufferMemory(return_messages=True)
-        # Add history messages to memory (role: "human" for user, "ai" for assistant)
-        for msg in history:
+
+        # Initialize message history
+        message_history = ChatMessageHistory()
+
+        # Restore previous messages into the chat memory
+        for msg in history_data:
             if msg.get("role") == "user":
-                memory.chat_memory.add_user_message(msg["content"])
+                message_history.add_message(HumanMessage(content=msg["content"]))
             elif msg.get("role") == "assistant":
-                memory.chat_memory.add_ai_message(msg["content"])
-        
-        # Create chain with prompt and memory
-        chain = ConversationChain(
-            llm=llm, 
-            prompt=prompt, 
-            memory=memory,
-            verbose=False  # Set to True for debugging
+                message_history.add_message(AIMessage(content=msg["content"]))
+
+        # Build the runnable pipeline (get model lazily)
+        chain = prompt | get_llm()
+
+        # Wrap with message history (persistent conversation memory)
+        chain_with_history = RunnableWithMessageHistory(
+            chain,
+            lambda session_id: message_history,
+            input_messages_key="input",
+            history_messages_key="history",
         )
-        
-        # Generate response
-        result = chain.invoke({"input": user_input})
-        response = result['response']
-        
-        if not response or response.strip() == "":
-            response = f"Sorry, {selected_person} couldn't think of a response right now."
-        
-        # Append to persistent history in DB (user input + response)
-        history.append({"role": "user", "content": user_input})
-        history.append({"role": "assistant", "content": response})
-        # Keep only last 20 exchanges to prevent bloat (10 user + 10 assistant)
-        chat_data.conversation_history = json.dumps(history[-20:])
+
+        # Generate model response
+        result = chain_with_history.invoke(
+            {"input": user_input},
+            config={"configurable": {"session_id": str(chat_data_id)}}
+        )
+
+        # Extract text safely
+        response = getattr(result, "content", str(result))
+
+        if not response.strip():
+            response = f"Sorry, {selected_person} couldn’t think of a response right now."
+
+        # Update DB conversation history
+        history_data.append({"role": "user", "content": user_input})
+        history_data.append({"role": "assistant", "content": response})
+        chat_data.conversation_history = json.dumps(history_data[-20:])
         db.session.commit()
-        
+
         return response
-    
+
     except Exception as e:
-        # Log error for debugging
         print(f"Chatbot error in get_chatbot_response: {e}")
         import traceback
-        traceback.print_exc()  # Optional: Full stack trace in console
-        return f"Oops! Something went wrong while generating a response: {str(e)}. Please try again."
+        traceback.print_exc()
+        return f"Oops! Something went wrong: {str(e)}. Please try again."
