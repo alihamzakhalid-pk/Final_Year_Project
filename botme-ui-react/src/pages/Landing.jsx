@@ -1,236 +1,392 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { Link, useNavigate } from 'react-router-dom'
-import { CloudUpload, Users, Shield, ArrowRight, Upload, Sparkles, MessageSquare, CheckCircle, ChevronRight, Brain, TrendingUp, Smile, BarChart3, Activity } from 'lucide-react'
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Link } from 'react-router-dom'
+import { 
+  Activity,
+  Brain,
+  CheckCircle, 
+  ChevronDown,
+  CloudUpload,
+  MessageSquare,
+  Shield,
+  Smile,
+  Sparkles,
+  Upload,
+  Users,
+} from 'lucide-react'
 import BotMeLogo from '../components/BotMeLogo'
 import UIButton from '../components/ui/Button'
 import UICard from '../components/ui/Card'
 
+const DESIGN_SYSTEM = {
+  spacing: {
+    section: 'py-16 px-4 sm:px-6 lg:px-12',
+    sectionTight: 'py-12 px-4 sm:px-6 lg:px-12',
+    gap: 'gap-8',
+  },
+  colors: {
+    primary: '#5B7FFF',
+    secondary: '#7C3AED',
+    accent: '#0EA5E9',
+    surface: '#F7F9FB',
+    surfaceAlt: '#FFFFFF',
+    textMain: '#0F172A',
+    textMuted: '#64748B',
+  },
+  borderRadius: 'rounded-3xl',
+  shadow: 'shadow-[0_28px_60px_rgba(15,23,42,0.12)]',
+}
+
+const HERO_MESSAGES = [
+  {
+    id: 1,
+    sender: 'Ali',
+    content: 'Bhai yaad hai humari Murree wali chill trip?',
+    time: 'Abhi',
+    isUser: false,
+  },
+  {
+    id: 2,
+    sender: 'You',
+    content: 'Kaise bhooloon! Tune guitar pe “Wonderwall” baja ke sab ko chup karwa diya tha.',
+    time: 'Abhi',
+    isUser: true,
+  },
+  {
+    id: 3,
+    sender: 'Ali',
+    content: 'Is weekend thora free ho? Ek chai session plan karte hain 👊',
+    time: 'Abhi',
+    isUser: false,
+  },
+]
+
+const HERO_STATS = [
+  { label: 'Personas revived', value: '150+' },
+  { label: 'Avg. response match', value: '92%' },
+  { label: 'Data deletion control', value: '1-click' },
+]
+
 const features = [
   {
     icon: CloudUpload,
-    iconBg: '#EFF6FF',
-    iconColor: '#5B7FFF',
-    title: 'Bring Back Any Conversation in Seconds',
-    description: 'Upload your WhatsApp chats and instantly extract all the people you\'ve talked to. No waiting, no complicated setup.',
+    title: 'Upload once, revive instantly',
+    description:
+      "Import WhatsApp chats in seconds. BotMe automatically detects every persona and prepares them for conversation—no manual setup.",
+    accent: 'from-[#EEF2FF] via-[#E0EAFF] to-[#F5F3FF]',
   },
   {
     icon: Users,
-    iconBg: '#F3E8FF',
-    iconColor: '#A855F7',
-    title: 'They Remember Everything, Just Like Real Conversations',
-    description: 'Each AI persona knows your entire chat history together. They remember your inside jokes, shared memories, and unique way of talking.',
+    title: 'Conversations that remember',
+    description:
+      'Each AI persona keeps your shared memories, tone, and shorthand alive so chats feel natural and personal every time.',
+    accent: 'from-[#ECFEFF] via-[#E0F2FE] to-[#F0F9FF]',
   },
   {
     icon: Shield,
-    iconBg: '#ECFDF5',
-    iconColor: '#10B981',
-    title: 'End-to-End Encrypted. We Never Read Your Messages.',
-    description: 'Your data stays private. We never read your conversations. Delete everything with one click, anytime.',
+    title: 'Privacy by default',
+    description:
+      'End-to-end encryption and on-demand deletion. Your messages stay yours, always. We never read or store beyond your control.',
+    accent: 'from-[#F5F3FF] via-[#EDE9FE] to-[#EEF2FF]',
+  },
+  {
+    icon: Sparkles,
+    title: 'Personalities you can fine-tune',
+    description:
+      'Adjust tone, energy, and memory depth with a slider. Save multiple variations for the same person in one clean workspace.',
+    accent: 'from-[#FDF2F8] via-[#FAE8FF] to-[#F5F3FF]',
   },
 ]
 
 const steps = [
   {
+    number: '01',
     icon: Upload,
-    title: 'Upload Chat',
-    description: 'Export your WhatsApp chat',
-    detail: 'BotMe automatically identifies people from your chats',
+    title: 'Upload your chat',
+    description: 'Drop in your exported WhatsApp file. BotMe handles clean-up and persona extraction.',
+    detail: 'Supports individual and group chats',
   },
   {
+    number: '02',
     icon: Sparkles,
-    title: 'Pick a Persona',
-    description: 'Select who you want to talk to',
-    detail: 'Choose from 1-50+ people depending on your chat history',
+    title: 'Select the personas',
+    description: 'Pick who you want to speak to again and adjust their tone, energy, or memory depth.',
+    detail: 'Preview personalities before saving',
   },
+  {
+    number: '03',
+    icon: MessageSquare,
+    title: 'Start talking instantly',
+    description: 'Chat in a modern UI with typing indicators, smart suggestions, and message history.',
+    detail: 'Responses feel like the person you remember',
+  },
+]
+
+const personalityTraits = [
   {
     icon: MessageSquare,
-    title: 'Start Talking',
-    description: 'Chat naturally with AI',
-    detail: 'They remember everything from your conversations',
+    name: 'Communication Style',
+    value: 88,
+    color: 'from-[#6366F1] to-[#22D3EE]',
+  },
+  {
+    icon: Smile,
+    name: 'Emotional Tone',
+    value: 73,
+    color: 'from-[#22C55E] to-[#14B8A6]',
+  },
+  {
+    icon: Activity,
+    name: 'Activity Pattern',
+    value: 94,
+    color: 'from-[#2563EB] to-[#38BDF8]',
   },
 ]
 
 const faqs = [
   {
     question: 'How accurate are the AI responses?',
-    answer: 'BotMe uses advanced AI to analyze your actual chat history and learn each person\'s unique communication style, tone, and personality. Responses are based on real conversations you\'ve had, making them highly accurate and authentic.',
+    answer:
+      "BotMe analyses your phrasing, cadence, reactions, and emoji use to recreate authentic replies. Most users rate the match above 90% after the first session.",
   },
   {
     question: 'Is my data safe and private?',
-    answer: 'Yes. Your data is end-to-end encrypted and stored securely. We never read your messages. You can delete all your data with one click at any time. Your privacy is our top priority.',
+    answer:
+      'Yes. Chats are encrypted at rest and in transit. You choose where your data is stored and can trigger auto-deletion whenever you like.',
   },
   {
     question: 'Can I delete my data anytime?',
-    answer: 'Absolutely. You have full control over your data. You can delete individual conversations, personas, or your entire account and all associated data with one click.',
+    answer:
+      'Absolutely. Wipe a single persona, clear a conversation, or remove your entire workspace with one click from the dashboard.',
   },
   {
     question: 'Can others see my conversations?',
-    answer: 'No. All your conversations are private and only accessible to you. We use industry-standard encryption and security measures to protect your data.',
+    answer:
+      'No. Every workspace is private. We never reuse, sell, or human-review your conversations—ever.',
   },
   {
     question: 'How many personas can I create?',
-    answer: 'You can create as many personas as you have people in your chat history. Most users extract 5-20 personas from a single chat export, but it can range from 1 to 50+ depending on your conversation history.',
+    answer:
+      'As many as your chat history includes. Power users revive 25+ personas from a single WhatsApp export without any slowdown.',
   },
   {
     question: 'How do I get started?',
-    answer: 'Simply upload your WhatsApp chat export, and BotMe will automatically extract all the personas. You can start chatting immediately - no setup required.',
+    answer:
+      'Upload your chat, preview the extracted personalities, and press start. You can set up your first conversation in under two minutes.',
   },
 ]
 
+const CTAButton = ({ children = 'Start for free', variant = 'ghost', to = '/signup', className = '', ...props }) => (
+  <UIButton
+    as={Link}
+    to={to}
+    variant={variant}
+    size="lg"
+    className={`rounded-2xl px-6 sm:px-8 py-3.5 font-semibold ${DESIGN_SYSTEM.shadow} hover:shadow-xl ${className}`}
+    {...props}
+  >
+    {children}
+  </UIButton>
+)
+
 export default function Landing() {
-  const navigate = useNavigate()
   const [openFaq, setOpenFaq] = useState(null)
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#F8FAFC] to-white">
-      {/* Hero Section - Full Viewport Height */}
-      <section className="relative min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 overflow-hidden pt-16 bg-gradient-to-b from-white via-[#F8FAFC] to-white">
-        {/* Modern Animated Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {/* Gradient orbs */}
-          <div className="absolute top-20 left-10 w-72 h-72 bg-[#6C63FF] rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob"></div>
-          <div className="absolute top-40 right-10 w-72 h-72 bg-[#3B82F6] rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-2000"></div>
-          <div className="absolute -bottom-8 left-1/2 w-72 h-72 bg-[#8B5CF6] rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-4000"></div>
-          
-          {/* Subtle grid pattern */}
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+    <div className="min-h-screen bg-[#F2F5FA] text-slate-900">
+      <header className="sticky top-0 z-30 border-b border-slate-200/50 bg-white/80 backdrop-blur-xl">
+        <motion.nav
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-12"
+        >
+          <Link to="/" className="flex items-center">
+            <BotMeLogo
+              size={64}
+              animated
+              showText
+              className="rounded-3xl bg-white/80 px-3 py-2 shadow-sm shadow-slate-900/10 ring-1 ring-white/70"
+            />
+          </Link>
+          <div className="hidden items-center gap-4 text-sm font-medium text-slate-600 md:flex">
+            <a href="#features" className="rounded-xl px-3 py-2 transition-colors hover:bg-slate-100 hover:text-slate-900">
+              Features
+            </a>
+            <a href="#how-it-works" className="rounded-xl px-3 py-2 transition-colors hover:bg-slate-100 hover:text-slate-900">
+              How it works
+            </a>
+            <a href="#insights" className="rounded-xl px-3 py-2 transition-colors hover:bg-slate-100 hover:text-slate-900">
+              Insights
+            </a>
+            <Link to="/login" className="rounded-xl px-3 py-2 transition-colors hover:bg-slate-100 hover:text-slate-900">
+              Log in
+            </Link>
+            <CTAButton
+              variant="ghost"
+              className="!shadow-none bg-gradient-to-r from-[#5B7FFF] via-[#6D5DFF] to-[#7C3AED] text-white hover:scale-[1.02]"
+            />
+          </div>
+          <Link to="/signup" className="md:hidden">
+            <UIButton variant="primary" size="md">
+              Join now
+            </UIButton>
+          </Link>
+        </motion.nav>
+      </header>
+
+      <main>
+        <section className={`relative overflow-hidden bg-gradient-to-br from-white via-[#EEF3FF] to-white ${DESIGN_SYSTEM.spacing.section}`}>
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute -top-20 -right-24 h-72 w-72 rounded-full bg-[#5B7FFF]/20 blur-3xl" />
+            <div className="absolute bottom-0 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-[#7C3AED]/20 blur-3xl" />
         </div>
 
-        <div className="relative z-10 max-w-4xl mx-auto text-center">
-          {/* Logo */}
+          <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-12">
           <motion.div
-            initial={{ opacity: 0, scale: 0.8, y: -20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
+              initial={{ opacity: 0, y: 28 }}
+              animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="mb-8 flex justify-center"
-          >
-            <BotMeLogo size={120} animated={true} showText={true} />
-          </motion.div>
-
-          {/* Main Headline */}
-          <motion.h1
-            className="mx-auto text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-[#1F2937] leading-tight mb-6"
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.6 }}
-            style={{ 
-              lineHeight: '1.1',
-              fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-              letterSpacing: '-0.03em',
-              fontWeight: 800
-            }}
-          >
-            Chat with Anyone,{' '}
-            <span className="bg-gradient-to-r from-[#6C63FF] to-[#3B82F6] bg-clip-text text-transparent">
-              Anytime
-            </span>
-          </motion.h1>
-
-          {/* Subheadline - Clarified */}
-          <motion.p
-            className="mx-auto max-w-2xl text-lg sm:text-xl lg:text-2xl text-[#1F2937] leading-relaxed mb-8"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.6 }}
-            style={{ 
-              lineHeight: '1.6',
-              fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-              fontWeight: 500
-            }}
-          >
-            Create AI companions from your real WhatsApp conversations.{' '}
-            <span className="text-[#6C63FF] font-semibold">Powered by deep personality analysis.</span>
-          </motion.p>
-
-          {/* Example Personas */}
-          <motion.div
-            className="flex flex-wrap items-center justify-center gap-2 mb-6 text-sm text-[#1F2937]"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.6 }}
-          >
-            <span className="px-3 py-1 bg-white/80 rounded-full border border-[#E5E7EB] text-[#1F2937]" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 600 }}>Your best friend from college</span>
-            <span className="px-3 py-1 bg-white/80 rounded-full border border-[#E5E7EB] text-[#1F2937]" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 600 }}>Your late grandfather</span>
-            <span className="px-3 py-1 bg-white/80 rounded-full border border-[#E5E7EB] text-[#1F2937]" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 600 }}>Your younger self</span>
-          </motion.div>
-
-          {/* CTA Buttons */}
-          <motion.div
-            className="flex items-center justify-center mb-4"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.6 }}
-          >
-            <UIButton
-              as={Link}
-              to="/signup"
-              className="rounded-full bg-gradient-to-r from-[#6C63FF] to-[#3B82F6] px-10 py-4 h-14 text-base font-bold text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-100 transition-all duration-200"
+              className="space-y-8 lg:col-span-6 xl:col-span-5"
             >
-              Create Your First AI Companion Free
-            </UIButton>
+              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/60 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 shadow-sm">
+                Human conversations, reimagined
+              </div>
+              <h1
+                className="text-4xl font-black leading-tight text-[#0F172A] sm:text-5xl lg:text-[3.5rem]"
+                style={{ letterSpacing: '-0.04em' }}
+              >
+                Bring past conversations back to life with living personas.
+              </h1>
+              <p className="max-w-xl text-lg leading-relaxed text-slate-600 sm:text-xl">
+                Upload a chat once. BotMe rebuilds the tone, timing, and personality of the people you care about so every reply feels
+                instantly familiar.
+              </p>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <CTAButton className="bg-gradient-to-r from-[#5B7FFF] via-[#6D5DFF] to-[#7C3AED] text-white" />
+                <UIButton
+                  as="a"
+                  href="#how-it-works"
+                  variant="outline"
+                  size="lg"
+                  className="rounded-2xl border-slate-300 bg-white px-6 py-3.5 font-semibold text-slate-900 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#5B7FFF] hover:text-[#111C44]"
+                >
+                  See how it works
+                </UIButton>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-3">
+                {HERO_STATS.map((stat) => (
+                  <div
+                    key={stat.label}
+                    className="rounded-2xl border border-slate-200/60 bg-white px-5 py-4 shadow-sm transition-transform duration-200 hover:-translate-y-1"
+                  >
+                    <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+                    <p className="text-sm font-medium text-slate-500">{stat.label}</p>
+                  </div>
+                ))}
+              </div>
           </motion.div>
 
-          {/* CTA Details */}
+            <motion.div
+              initial={{ opacity: 0, y: 32 }}
+            animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.6 }}
+              className="relative lg:col-span-6 lg:col-start-7 xl:col-span-7"
+            >
+              <div className="pointer-events-none absolute -top-10 left-16 hidden h-32 w-32 rounded-full bg-[#0EA5E9]/10 blur-2xl lg:block" />
+              <div className="pointer-events-none absolute bottom-10 -right-12 hidden h-28 w-28 rounded-full bg-[#7C3AED]/10 blur-2xl lg:block" />
+
+              <div className="relative rounded-[32px] border border-white/60 bg-white/90 p-6 shadow-xl shadow-slate-900/10 backdrop-blur-xl">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#5B7FFF] to-[#7C3AED] font-semibold text-white">
+                      S
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">Ali Khan</p>
+                      <div className="flex items-center gap-2 text-xs text-emerald-500">
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Online now
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 text-xs text-slate-400">
+                    <span className="rounded-full bg-slate-100 px-3 py-1">Tone • Warm</span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1">Memory • Deep</span>
+                  </div>
+                </div>
+
+                <div className="space-y-4 py-6">
+                  {HERO_MESSAGES.map((message, index) => (
           <motion.div
-            className="flex flex-wrap items-center justify-center gap-4 text-sm text-[#1F2937] font-bold"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6, duration: 0.6 }}
-          >
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-[#10B981]" />
-              <span>Takes 2 minutes</span>
+                      key={message.id}
+                      initial={{ opacity: 0, x: message.isUser ? 20 : -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.15 * index }}
+                      className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow ${
+                          message.isUser
+                            ? 'bg-gradient-to-r from-[#5B7FFF] to-[#7C3AED] text-white shadow-[#5B7FFF]/40'
+                            : 'bg-slate-50 text-slate-700 shadow-slate-200'
+                        }`}
+                      >
+                        <span className="block font-medium">{message.content}</span>
+                        <span className="mt-1 block text-xs opacity-70">{message.time}</span>
+                      </div>
+          </motion.div>
+                  ))}
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-400">
+                  Suggestion • “The photos are in our shared folder — want me to resend?”
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-[#10B981]" />
-              <span>No setup required</span>
             </div>
           </motion.div>
       </div>
       </section>
 
-      {/* Feature Cards Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-white border-t border-[#E5E7EB]">
-        <div className="max-w-7xl mx-auto">
+        <section id="features" className={`${DESIGN_SYSTEM.spacing.section} bg-white`}>
+          <div className="mx-auto max-w-7xl">
           <motion.div
-            className="text-center mb-12"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+              viewport={{ once: true, amount: 0.4 }}
             transition={{ duration: 0.6 }}
-          >
-            <h2 className="text-3xl sm:text-4xl font-bold text-[#1F2937] mb-3" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', letterSpacing: '-0.02em' }}>Why BotMe?</h2>
-            <p 
-              className="text-base sm:text-lg max-w-2xl mx-auto text-[#1F2937]"
-              style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 500 }}
+              className="mx-auto mb-14 max-w-2xl text-center"
             >
-              Everything you need to bring your conversations back to life
+              <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF2FF] px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-[#5B7FFF]">
+                Why BotMe works
+              </div>
+              <h2 className="mt-6 text-3xl font-bold text-slate-900 sm:text-4xl">
+                Built for conversations that matter, without clutter or guesswork.
+            </h2>
+              <p className="mt-4 text-lg text-slate-600">
+                Every surface follows the same rhythm: clear typography, smooth motion, and contrast-checked palettes that stay readable
+                on every screen.
             </p>
           </motion.div>
 
-          <div className="grid gap-6 md:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
             {features.map((feature, index) => {
               const Icon = feature.icon
               return (
                 <motion.div
                   key={feature.title}
-                  initial={{ opacity: 0, y: 24 }}
+                    initial={{ opacity: 0, y: 16 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: index * 0.1, duration: 0.5 }}
-                  whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                >
-                  <UICard className="rounded-xl bg-white p-6 text-center shadow-sm hover:shadow-md transition-all duration-200 border border-[#E5E7EB] h-full">
-                    <div
-                      className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full"
-                      style={{ backgroundColor: feature.iconBg }}
+                    viewport={{ once: true, amount: 0.3 }}
+                    transition={{ delay: index * 0.08, duration: 0.5 }}
+                  >
+                    <UICard
+                      className={`${DESIGN_SYSTEM.borderRadius} border border-slate-100 bg-gradient-to-br ${feature.accent} p-8 shadow-lg shadow-slate-900/5 transition-transform duration-200 hover:-translate-y-1 hover:shadow-xl`}
                     >
-                      <Icon className="h-7 w-7" style={{ color: feature.iconColor }} />
+                      <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#5B7FFF] shadow-sm">
+                        <Icon className="h-6 w-6" strokeWidth={2} />
                     </div>
-                    <h3 className="text-base font-bold mb-2 text-[#1F2937]" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 700 }}>{feature.title}</h3>
-                    <p className="text-sm leading-relaxed text-[#1F2937]" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 400 }}>{feature.description}</p>
+                      <h3 className="mb-3 text-xl font-semibold text-slate-900">{feature.title}</h3>
+                      <p className="text-base text-slate-600">{feature.description}</p>
                   </UICard>
                 </motion.div>
               )
@@ -239,339 +395,196 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-[#F8FAFC] border-t border-[#E5E7EB]">
-        <div className="max-w-7xl mx-auto">
+        <section id="how-it-works" className={`${DESIGN_SYSTEM.spacing.section} bg-[#EEF3FF]`}>
+          <div className="mx-auto max-w-7xl">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+              viewport={{ once: true, amount: 0.4 }}
             transition={{ duration: 0.6 }}
-          >
-            <UICard className="rounded-xl bg-white p-8 sm:p-12 shadow-lg border border-[#E5E7EB]">
-              <motion.div
-                className="text-center mb-12"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6 }}
-              >
-                <h2 className="text-3xl sm:text-4xl font-bold text-[#1F2937] mb-3" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', letterSpacing: '-0.02em' }}>Get Started in 3 Steps</h2>
+              className="mx-auto mb-12 max-w-xl text-center"
+            >
+              <div className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-[#7C3AED] shadow-sm shadow-slate-900/10">
+                Three smooth steps
+              </div>
+              <h2 className="mt-6 text-3xl font-bold text-slate-900 sm:text-4xl">From upload to lifelike chats in minutes.</h2>
+              <p className="mt-4 text-lg text-slate-600">
+                Every stage is guided. Simply follow the prompts, preview the persona, and press start.
+            </p>
               </motion.div>
 
-              <div className="grid gap-6 md:grid-cols-3 items-start">
+            <div className="grid gap-6 md:grid-cols-3">
                 {steps.map((step, index) => {
                   const Icon = step.icon
                   return (
                     <motion.div
                       key={step.title}
-                      initial={{ opacity: 0, y: 24 }}
+                    initial={{ opacity: 0, y: 20 }}
                       whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ delay: index * 0.15, duration: 0.5 }}
+                    viewport={{ once: true, amount: 0.4 }}
+                    transition={{ delay: index * 0.1, duration: 0.5 }}
                       className="relative"
                     >
-                      {/* Arrow between steps (desktop only) */}
                       {index < steps.length - 1 && (
-                        <div className="hidden md:block absolute top-1/2 left-full w-full -translate-x-1/2 -translate-y-1/2 z-0">
-                          <ArrowRight className="h-5 w-5 text-[#5B7FFF] mx-auto" />
+                      <div className="absolute right-0 top-1/2 hidden h-px w-full translate-x-1/2 bg-gradient-to-r from-[#5B7FFF]/0 via-[#5B7FFF]/40 to-[#5B7FFF]/0 md:block" />
+                    )}
+                    <UICard className="relative z-10 h-full rounded-[28px] border border-white bg-white/80 p-8 shadow-md backdrop-blur-xl transition-transform duration-200 hover:-translate-y-1 hover:shadow-xl">
+                      <div className="mb-8 flex items-center justify-between">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5B7FFF] to-[#7C3AED] text-white shadow-lg">
+                        {step.number}
+                      </div>
+                        <div className="rounded-2xl bg-[#EEF3FF] p-3 text-[#5B7FFF]">
+                          <Icon className="h-6 w-6" />
+                      </div>
                         </div>
-                      )}
-
-                      <UICard className="relative z-10 rounded-xl bg-white p-6 text-center shadow-sm hover:shadow-md transition-all duration-200 border border-[#E5E7EB] h-full">
-                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#5B7FFF] text-white shadow-lg">
-                          <Icon className="h-7 w-7" />
-                        </div>
-                        <h3 className="text-lg font-bold mb-1 text-[#1F2937]" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 700 }}>Step {index + 1}</h3>
-                        <h4 className="text-base font-bold mb-2 text-[#1F2937]" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 700 }}>{step.title}</h4>
-                        <p className="text-sm leading-relaxed mb-1 text-[#1F2937]" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 500 }}>{step.description}</p>
-                        <p className="text-xs italic text-[#1F2937]" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 400 }}>{step.detail}</p>
+                      <h3 className="mb-3 text-xl font-semibold text-slate-900">{step.title}</h3>
+                      <p className="mb-2 text-base text-slate-600">{step.description}</p>
+                      <p className="text-sm font-medium text-slate-500">{step.detail}</p>
                       </UICard>
                     </motion.div>
                   )
                 })}
               </div>
-            </UICard>
-          </motion.div>
         </div>
       </section>
 
-      {/* Personality Analysis Overview Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 border-t border-[#E5E7EB]">
-        <div className="max-w-7xl mx-auto">
+        <section id="insights" className={`${DESIGN_SYSTEM.spacing.section} bg-white`}>
+          <div className="mx-auto max-w-7xl">
           <motion.div
-            className="text-center mb-12"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+              viewport={{ once: true, amount: 0.4 }}
             transition={{ duration: 0.6 }}
+              className="mx-auto mb-14 max-w-3xl text-center"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-400/30 mb-4">
-              <Brain className="h-5 w-5 text-purple-200" />
-              <span className="text-white text-sm font-semibold">AI-Powered Insights</span>
+              <div className="inline-flex items-center gap-2 rounded-full bg-[#F0F9FF] px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-[#0EA5E9]">
+                Personality insights
             </div>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '-0.02em' }}>
-              Deep Personality Analysis
+              <h2 className="mt-6 text-3xl font-bold text-slate-900 sm:text-4xl">
+                Understand how every persona speaks before you send a single message.
             </h2>
-            <p className="text-lg sm:text-xl text-white/90 max-w-2xl mx-auto" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', fontWeight: 500 }}>
-              Understand communication styles, emotional patterns, and personality traits through advanced AI analysis
+              <p className="mt-4 text-lg text-slate-600">
+                Deep personality breakdowns reveal tone, pacing, sentiment, and memory cues. Fine-tune them to keep the conversation
+                feeling true-to-life.
             </p>
           </motion.div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-12">
-            {/* Communication Style */}
-            <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1, duration: 0.5 }}
-              whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            >
-              <UICard className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 text-center h-full">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-purple-400/30">
-                  <MessageSquare className="h-7 w-7 text-purple-300" />
-                </div>
-                <h3 className="text-lg font-bold text-white mb-2" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                  Communication Style
-                </h3>
-                <p className="text-sm text-white/80 leading-relaxed" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                  Analyze casual vs formal patterns, message length, and vocabulary richness
-                </p>
-              </UICard>
-            </motion.div>
-
-            {/* Emotional Tone */}
-            <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2, duration: 0.5 }}
-              whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            >
-              <UICard className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 text-center h-full">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-400/30">
-                  <Smile className="h-7 w-7 text-green-300" />
-                </div>
-                <h3 className="text-lg font-bold text-white mb-2" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                  Emotional Tone
-                </h3>
-                <p className="text-sm text-white/80 leading-relaxed" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                  Sentiment analysis showing positive, neutral, and negative emotional patterns
-                </p>
-              </UICard>
-            </motion.div>
-
-            {/* Activity Patterns */}
-            <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.3, duration: 0.5 }}
-              whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            >
-              <UICard className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 text-center h-full">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-400/30">
-                  <Activity className="h-7 w-7 text-blue-300" />
-                </div>
-                <h3 className="text-lg font-bold text-white mb-2" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                  Activity Patterns
-                </h3>
-                <p className="text-sm text-white/80 leading-relaxed" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                  Discover most active times, response patterns, and messaging frequency
-                </p>
-              </UICard>
-            </motion.div>
-
-            {/* Personality Traits */}
-            <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.4, duration: 0.5 }}
-              whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            >
-              <UICard className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 text-center h-full">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-400/30">
-                  <Brain className="h-7 w-7 text-purple-300" />
-                </div>
-                <h3 className="text-lg font-bold text-white mb-2" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                  Big Five Traits
-                </h3>
-                <p className="text-sm text-white/80 leading-relaxed" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                  Comprehensive personality analysis using the Big Five model
-                </p>
-              </UICard>
-            </motion.div>
-          </div>
-
-          {/* Preview Dashboard */}
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ duration: 0.6 }}
+              className="rounded-[34px] border border-slate-100 bg-gradient-to-br from-white via-[#F8FBFF] to-white p-10 shadow-xl shadow-slate-900/5"
           >
-            <UICard className="bg-white/10 backdrop-blur-xl border border-white/20 p-8 rounded-2xl">
-              <div className="grid gap-6 md:grid-cols-2">
-                {/* Left: Stats Preview */}
-                <div className="space-y-4">
-                  <h3 className="text-2xl font-bold text-white mb-6" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                    Key Insights Preview
-                  </h3>
-                  
-                  <div className="space-y-3">
-                    <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-white/90 text-sm font-medium">Communication Style</span>
-                        <span className="text-white font-semibold">78% Casual</span>
+              <div className="grid gap-10 lg:grid-cols-3">
+                {personalityTraits.map((trait, index) => {
+                  const Icon = trait.icon
+                  return (
+                        <motion.div
+                      key={trait.name}
+                      initial={{ opacity: 0, y: 16 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, amount: 0.4 }}
+                      transition={{ delay: index * 0.12, duration: 0.5 }}
+                      className="rounded-3xl border border-slate-100 bg-white/80 p-6 shadow-sm"
+                    >
+                      <div className="mb-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EEF3FF] text-[#5B7FFF]">
+                            <Icon className="h-6 w-6" strokeWidth={2} />
+                          </div>
+                          <div className="text-left">
+                            <p className="text-sm font-medium text-slate-500">Persona trait</p>
+                            <h3 className="text-lg font-semibold text-slate-900">{trait.name}</h3>
                       </div>
-                      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                    </div>
+                        <span className="text-xl font-bold text-slate-900">{trait.value}%</span>
+                      </div>
+                      <p className="text-sm text-slate-500">
+                        BotMe tracks phrasing, response time, and emoji density to shape this persona. Adjust the sliders to get the tone
+                        you expect.
+                      </p>
+                      <div className="mt-5 h-3 rounded-full bg-slate-100">
                         <motion.div
                           initial={{ width: 0 }}
-                          whileInView={{ width: '78%' }}
-                          viewport={{ once: true }}
-                          transition={{ duration: 0.8, delay: 0.3 }}
-                          className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"
+                            whileInView={{ width: `${trait.value}%` }}
+                          viewport={{ once: true, amount: 0.4 }}
+                          transition={{ duration: 0.7, delay: 0.2 }}
+                          className={`h-full rounded-full bg-gradient-to-r ${trait.color}`}
                         />
-                      </div>
+                    </div>
+                    </motion.div>
+                  )
+                })}
                     </div>
 
-                    <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-white/90 text-sm font-medium">Emotional Tone</span>
-                        <span className="text-white font-semibold">65% Positive</span>
-                      </div>
-                      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          whileInView={{ width: '65%' }}
-                          viewport={{ once: true }}
-                          transition={{ duration: 0.8, delay: 0.4 }}
-                          className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-white/90 text-sm font-medium">Avg. Message Length</span>
-                        <span className="text-white font-semibold">12 words</span>
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-white/90 text-sm font-medium">Most Active</span>
-                        <span className="text-white font-semibold">9PM-11PM</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right: Radar Chart Preview */}
+              <div className="mt-10 flex flex-col items-center justify-between gap-6 rounded-3xl border border-slate-200 bg-white/70 p-6 text-center shadow-inner shadow-slate-900/5 md:flex-row md:text-left">
                 <div>
-                  <h3 className="text-2xl font-bold text-white mb-6" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                    Personality Traits
+                  <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">Control panel</p>
+                  <h3 className="mt-2 text-2xl font-semibold text-slate-900">
+                    Tweak a persona live and see how the tone shifts in real time.
                   </h3>
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                    <ResponsiveContainer width="100%" height={280}>
-                      <RadarChart data={[
-                        { trait: 'Openness', value: 82, fullMark: 100 },
-                        { trait: 'Conscientiousness', value: 70, fullMark: 100 },
-                        { trait: 'Extraversion', value: 45, fullMark: 100 },
-                        { trait: 'Agreeableness', value: 65, fullMark: 100 },
-                        { trait: 'Emotional Stability', value: 58, fullMark: 100 },
-                      ]}>
-                        <PolarGrid stroke="rgba(255,255,255,0.1)" />
-                        <PolarAngleAxis 
-                          dataKey="trait" 
-                          tick={{ fill: '#C4B5FD', fontSize: 11, fontFamily: 'system-ui, sans-serif' }}
-                        />
-                        <PolarRadiusAxis 
-                          angle={90} 
-                          domain={[0, 100]}
-                          tick={{ fill: '#A78BFA', fontSize: 9 }}
-                        />
-                        <Radar
-                          name="Personality"
-                          dataKey="value"
-                          stroke="#8B5CF6"
-                          fill="#8B5CF6"
-                          fillOpacity={0.6}
-                          strokeWidth={2}
-                        />
-                      </RadarChart>
-                    </ResponsiveContainer>
-                  </div>
+                  <p className="mt-2 text-slate-500">
+                    Activate Focus Mode to view message samples, sentiment graphs, and conversation triggers side-by-side.
+                  </p>
                 </div>
+                <CTAButton className="bg-gradient-to-r from-[#0EA5E9] via-[#5B7FFF] to-[#7C3AED] text-white">
+                  Explore the dashboard
+                </CTAButton>
               </div>
-
-              <div className="mt-8 text-center">
-                <UIButton
-                  as={Link}
-                  to="/signup"
-                  className="rounded-full bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-3 text-white font-bold hover:from-purple-700 hover:to-blue-700 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
-                >
-                  Explore Full Analysis Dashboard
-                  <ArrowRight className="h-5 w-5 ml-2 inline" />
-                </UIButton>
-              </div>
-            </UICard>
           </motion.div>
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-white border-t border-[#E5E7EB]">
-        <div className="max-w-3xl mx-auto">
+        <section className={`${DESIGN_SYSTEM.spacing.section} bg-[#F7F9FB]`}>
+          <div className="mx-auto max-w-4xl">
           <motion.div
-            className="text-center mb-10"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+              viewport={{ once: true, amount: 0.4 }}
             transition={{ duration: 0.6 }}
-          >
-            <h2 className="text-3xl sm:text-4xl font-bold text-[#1F2937] mb-3" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', letterSpacing: '-0.02em' }}>Frequently Asked Questions</h2>
-            <p 
-              className="text-base sm:text-lg text-[#1F2937]"
-              style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 500 }}
+              className="mb-12 text-center"
             >
-              Everything you need to know about BotMe
+              <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">Frequently asked questions</h2>
+              <p className="mt-3 text-lg text-slate-600">
+                Clear answers so you feel confident before you upload anything.
             </p>
           </motion.div>
 
           <div className="space-y-4">
             {faqs.map((faq, index) => (
               <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
+                  key={faq.question}
+                  initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1, duration: 0.5 }}
+                  viewport={{ once: true, amount: 0.4 }}
+                  transition={{ delay: index * 0.05, duration: 0.4 }}
               >
-                <UICard className="rounded-xl bg-white p-6 shadow-sm border border-[#E5E7EB]">
+                  <UICard className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm shadow-slate-900/5">
                   <button
+                      type="button"
                     onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                    className="w-full flex items-center justify-between text-left"
+                      className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-slate-50"
                   >
-                    <h3 className="text-lg font-bold text-[#1F2937] pr-4" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 700 }}>{faq.question}</h3>
-                    <ChevronRight
-                      className={`h-5 w-5 text-[#1F2937] flex-shrink-0 transition-transform ${
-                        openFaq === index ? 'transform rotate-90' : ''
-                      }`}
+                      <span className="text-lg font-semibold text-slate-900">{faq.question}</span>
+                    <ChevronDown
+                        className={`h-6 w-6 text-slate-400 transition-transform duration-300 ${openFaq === index ? 'rotate-180' : ''}`}
                     />
                   </button>
+                    <AnimatePresence initial={false}>
                   {openFaq === index && (
-                    <motion.p
+                      <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="mt-4 text-[#1F2937] leading-relaxed"
-                      style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 400 }}
+                        transition={{ duration: 0.3 }}
                     >
+                          <div className="border-t border-slate-200/70 px-6 py-5 text-base leading-relaxed text-slate-600">
                       {faq.answer}
-                    </motion.p>
+                        </div>
+                      </motion.div>
                   )}
+                  </AnimatePresence>
                 </UICard>
               </motion.div>
             ))}
@@ -579,41 +592,57 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Final CTA Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-[#5B7FFF] to-[#A855F7] text-white border-t border-[#E5E7EB]">
+        <section className={`${DESIGN_SYSTEM.spacing.section} bg-gradient-to-br from-[#0EA5E9] via-[#5B7FFF] to-[#7C3AED] text-white`}>
         <motion.div
-          className="max-w-3xl mx-auto text-center"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+            viewport={{ once: true, amount: 0.4 }}
           transition={{ duration: 0.6 }}
+            className="mx-auto max-w-4xl text-center"
         >
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-white" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', letterSpacing: '-0.02em' }}>
-            Ready to bring your conversations back to life?
+            <h2 className="text-3xl font-bold sm:text-4xl">
+              Ready to meet the people you miss, exactly how you remember them?
           </h2>
-          <p className="text-base sm:text-lg mb-6 text-white" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 500 }}>
-            Start creating AI companions from your WhatsApp chats today
-          </p>
-          <UIButton
-            as={Link}
-            to="/signup"
-            variant="outline"
-            className="rounded-full bg-white px-12 py-5 h-16 text-lg font-bold !text-[#5B7FFF] border-0 shadow-lg hover:bg-gray-100 hover:shadow-xl hover:scale-105 active:scale-100 transition-all duration-200"
-          >
-            Create Your First AI Companion Free
-          </UIButton>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-sm text-white font-semibold">
+            <p className="mt-4 text-lg text-white/85">
+              Upload a single chat export and you’ll be chatting in less time than it takes to brew coffee.
+            </p>
+            <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
+              <UIButton
+                as={Link}
+                to="/signup"
+                variant="ghost"
+                size="lg"
+                className="rounded-2xl border border-white/60 bg-white/95 px-6 py-3.5 font-semibold !text-[#3451E6] shadow-lg shadow-slate-900/15 transition-all hover:-translate-y-0.5 hover:bg-white"
+              >
+                Start chatting now
+              </UIButton>
+              <UIButton
+                as="a"
+                href="mailto:hello@botme.ai"
+                variant="ghost"
+                size="lg"
+                className="rounded-2xl px-6 py-3 font-semibold text-white hover:bg-white/10"
+              >
+                Talk to a specialist
+              </UIButton>
+            </div>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-6 text-sm text-white/80">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5" />
+                <span>End-to-end encrypted</span>
+          </div>
             <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-white" />
-              <span>Takes 2 minutes</span>
+                <CheckCircle className="h-5 w-5" />
+                <span>One-click data deletion</span>
             </div>
             <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-white" />
-              <span>No setup required</span>
+                <CheckCircle className="h-5 w-5" />
+                <span>Live onboarding support</span>
             </div>
           </div>
         </motion.div>
       </section>
+      </main>
       </div>
   )
 }

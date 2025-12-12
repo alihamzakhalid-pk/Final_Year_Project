@@ -12,6 +12,7 @@ import Privacy from './pages/Privacy'
 import Terms from './pages/Terms'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import ForgotPassword from './pages/ForgotPassword'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './hooks/useAuth'
 import useThemePreference from './hooks/useThemePreference'
@@ -21,14 +22,12 @@ import PersonalityAnalysis from './pages/PersonalityAnalysis'
 import { ToastProvider } from './components/ui/Toast'
 
 export default function App() {
-  const { mode } = useThemePreference()
   const location = useLocation()
 
   return (
-    <div className={mode === 'dark' ? 'dark' : ''}>
-      <ToastProvider>
-        <AuthProvider>
-          <div className="min-h-screen flex flex-col bg-[#F8FAFC] transition-colors duration-300">
+    <ToastProvider>
+      <AuthProvider>
+        <div className="min-h-screen flex flex-col bg-[#F8FAFC] dark:bg-[#1F2937] transition-colors duration-300">
           <Navbar />
           <AnimatePresence mode="wait">
             <motion.main
@@ -43,6 +42,7 @@ export default function App() {
                     <Route path="/" element={<Landing />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/signup" element={<Signup />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/about" element={<About />} />
                     <Route path="/help" element={<Help />} />
                     <Route path="/contact" element={<Contact />} />
@@ -93,11 +93,10 @@ export default function App() {
                 </Routes>
             </motion.main>
           </AnimatePresence>
-          <Footer />
+          {!location.pathname.startsWith('/chat') && <Footer />}
         </div>
-        </AuthProvider>
-      </ToastProvider>
-    </div>
+      </AuthProvider>
+    </ToastProvider>
   )
 }
 

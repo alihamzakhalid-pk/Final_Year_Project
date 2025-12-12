@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, MessageSquare } from 'lucide-react'
+import { MessageSquare } from 'lucide-react'
 import UICard from '../components/ui/Card'
 import UIButton from '../components/ui/Button'
 import Avatar from '../components/Avatar'
@@ -115,12 +115,11 @@ export default function SelectPerson() {
                     This persona has been analyzed from {participant.count} messages in your chat transcript.
                   </p>
                   <UIButton
-                    className="mt-6 w-full rounded-xl bg-[#5B7FFF] px-6 py-3 text-white font-semibold shadow-md hover:bg-[#4A6BFF] group/btn"
+                    className="mt-6 w-full rounded-xl bg-[#5B7FFF] px-6 py-3 text-white font-semibold shadow-md hover:bg-[#4A6BFF]"
                     onClick={() => handleSelect(participant.name)}
                     disabled={loading}
                   >
                     Start Chatting
-                    <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
                   </UIButton>
                 </div>
               </UICard>

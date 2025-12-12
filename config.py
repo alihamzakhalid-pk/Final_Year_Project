@@ -22,3 +22,21 @@ class Config:
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER') or MAIL_USERNAME
+    
+    # OAuth Configuration
+    GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
+    GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
+    FACEBOOK_CLIENT_ID = os.environ.get('FACEBOOK_CLIENT_ID')
+    FACEBOOK_CLIENT_SECRET = os.environ.get('FACEBOOK_CLIENT_SECRET')
+    MICROSOFT_CLIENT_ID = os.environ.get('MICROSOFT_CLIENT_ID')
+    MICROSOFT_CLIENT_SECRET = os.environ.get('MICROSOFT_CLIENT_SECRET')
+    APPLE_CLIENT_ID = os.environ.get('APPLE_CLIENT_ID')
+    APPLE_CLIENT_SECRET = os.environ.get('APPLE_CLIENT_SECRET')
+    GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID')
+    GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET')
+
+    # OAuth redirect URI overrides (optional)
+    GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'http://localhost:5000/api/oauth/google/callback')
+    
+    # Frontend URL for OAuth redirects
+    FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')

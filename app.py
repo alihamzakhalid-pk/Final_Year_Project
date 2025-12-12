@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 import re
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -10,10 +10,13 @@ import os
 import json
 import random
 import string
+import requests
+import urllib.parse
 from parse_chat import parse_chat_file
 from chatbot import get_chatbot_response
 from personality_analysis import analyze_personality
 from datetime import datetime, timedelta
+from oauth_handler import get_oauth_auth_url, exchange_oauth_code, get_or_create_oauth_user
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -46,15 +49,15 @@ def generate_verification_code():
 
 
 def send_verification_email(email, code, purpose='signup'):
-    """Send verification code email"""
+    """Send verification or reset code email"""
     try:
         # Check if mail is configured
         if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
             print("[EMAIL ERROR] MAIL_USERNAME or MAIL_PASSWORD not configured in .env file")
             return False
-        
-        subject = f"Your BotMe Verification Code - {code}"
+
         if purpose == 'signup':
+            subject = f"Your BotMe Verification Code - {code}"
             body = f"""
 Hello!
 
@@ -69,7 +72,8 @@ If you didn't request this code, please ignore this email.
 Best regards,
 BotMe Team
 """
-        else:  # login
+        elif purpose == 'login':
+            subject = f"Your BotMe Login Code - {code}"
             body = f"""
 Hello!
 
@@ -84,7 +88,21 @@ If you didn't request this code, please ignore this email.
 Best regards,
 BotMe Team
 """
-        
+        else:  # password reset
+            subject = "Reset your BotMe password"
+            body = f"""
+Hello!
+
+We received a request to reset the password for your BotMe account.
+
+Use this verification code to reset your password: {code}
+
+This code will expire in 10 minutes. If you did not request a password reset, you can safely ignore this email.
+
+Best regards,
+BotMe Team
+"""
+
         print(f"[EMAIL] Attempting to send email to {email} via {app.config.get('MAIL_SERVER')}:{app.config.get('MAIL_PORT')}")
         msg = Message(subject=subject, recipients=[email], body=body)
         mail.send(msg)
@@ -583,6 +601,94 @@ def api_verify_login():
         'token': 'session'
     }), 200
 
+
+@app.route('/api/request-password-reset', methods=['POST'])
+def api_request_password_reset():
+    """Send a reset code to the user's email."""
+    data = request.json or {}
+    email = (data.get('email') or '').strip().lower()
+
+    if not email:
+        return jsonify({'error': 'Email is required'}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        # Avoid leaking which emails exist
+        return jsonify({'message': 'If an account exists, a reset code has been sent'}), 200
+
+    if user.oauth_provider and not user.password_hash:
+        return jsonify({'error': f"This account uses {user.oauth_provider.capitalize()} sign-in. Use that provider to sign in."}), 400
+
+    # Remove existing reset codes for this email
+    VerificationCode.query.filter_by(email=email, purpose='reset').delete()
+
+    code = generate_verification_code()
+    expires_at = datetime.utcnow() + timedelta(minutes=10)
+
+    verification = VerificationCode(
+        email=email,
+        code=code,
+        purpose='reset',
+        expires_at=expires_at,
+        temp_data=None,
+    )
+    db.session.add(verification)
+    db.session.commit()
+
+    if send_verification_email(email, code, 'reset'):
+        return jsonify({'message': 'Reset code sent to your email', 'email': email}), 200
+
+    return jsonify({'error': 'Failed to send reset email. Please check your email configuration.'}), 500
+
+
+@app.route('/api/reset-password', methods=['POST'])
+def api_reset_password():
+    """Reset password after verifying the code."""
+    data = request.json or {}
+    email = (data.get('email') or '').strip().lower()
+    code = (data.get('code') or '').strip()
+    new_password = data.get('new_password') or data.get('password')
+
+    if not email or not code or not new_password:
+        return jsonify({'error': 'Email, code, and new password are required'}), 400
+
+    if len(new_password) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters long'}), 400
+
+    verification = VerificationCode.query.filter_by(
+        email=email,
+        code=code,
+        purpose='reset'
+    ).first()
+
+    if not verification:
+        return jsonify({'error': 'Invalid reset code'}), 400
+
+    if verification.is_expired():
+        db.session.delete(verification)
+        db.session.commit()
+        return jsonify({'error': 'Reset code has expired. Please request a new one.'}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        db.session.delete(verification)
+        db.session.commit()
+        return jsonify({'error': 'User not found'}), 404
+
+    # Update password
+    user.set_password(new_password)
+
+    db.session.delete(verification)
+    db.session.commit()
+
+    login_user(user)
+
+    return jsonify({
+        'message': 'Password updated successfully',
+        'user': serialize_user(user),
+        'token': 'session'
+    }), 200
+
 @app.route('/api/logout', methods=['POST'])
 @login_required
 def api_logout():
@@ -965,6 +1071,87 @@ def api_personality_analysis(chat_id):
         traceback.print_exc()
         print(f"[PERSONALITY] ====== END ERROR ======")
         return jsonify({'error': f'Failed to analyze personality: {str(e)}'}), 500
+
+# OAuth Endpoints
+@app.route('/api/oauth/<provider>', methods=['GET', 'OPTIONS'])
+def oauth_login(provider):
+    """Initiate OAuth flow for a provider"""
+    try:
+        provider = provider.lower()
+        if provider not in ['google', 'facebook', 'microsoft', 'github']:
+            return jsonify({'error': f'Provider {provider} not supported'}), 400
+        
+        auth_url = get_oauth_auth_url(provider)
+        if not auth_url:
+            return jsonify({
+                'error': f'{provider.capitalize()} OAuth is not configured. Please set {provider.upper()}_CLIENT_ID and {provider.upper()}_CLIENT_SECRET in environment variables.'
+            }), 500
+        
+        return jsonify({'auth_url': auth_url})
+    except Exception as e:
+        print(f"Error in oauth_login for {provider}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+
+@app.route('/api/oauth/<provider>/callback', methods=['GET'])
+def oauth_callback(provider):
+    """Handle OAuth callback from provider"""
+    provider = provider.lower()
+    code = request.args.get('code')
+    state = request.args.get('state')
+    error = request.args.get('error')
+    
+    # Get frontend URL from config or request
+    frontend_url = app.config.get('FRONTEND_URL', 'http://localhost:5173')
+    
+    if error:
+        return redirect(f"{frontend_url}?oauth_error={error}&provider={provider}")
+    
+    # Verify state
+    session_state = session.get(f'oauth_state_{provider}')
+    if not session_state or session_state != state:
+        return redirect(f"{frontend_url}?oauth_error=invalid_state&provider={provider}")
+    
+    session.pop(f'oauth_state_{provider}', None)
+    
+    if not code:
+        return redirect(f"{frontend_url}?oauth_error=no_code&provider={provider}")
+    
+    # Exchange code for token
+    redirect_uri = f"{request.host_url.rstrip('/')}/api/oauth/{provider}/callback"
+    
+    try:
+        user_info = exchange_oauth_code(provider, code, redirect_uri)
+        if not user_info:
+            return redirect(f"{frontend_url}?oauth_error=token_exchange_failed&provider={provider}")
+        
+        # Create or get user
+        user = get_or_create_oauth_user(provider, user_info)
+        if user:
+            login_user(user)
+            # Return JSON for frontend to handle
+            token = 'session'  # Using session-based auth
+            return redirect(f"{frontend_url}/login?oauth_success=true&provider={provider}&token={token}")
+        else:
+            return redirect(f"{frontend_url}?oauth_error=user_creation_failed&provider={provider}")
+    except Exception as e:
+        print(f"OAuth error for {provider}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return redirect(f"{frontend_url}?oauth_error={urllib.parse.quote(str(e))}&provider={provider}")
+
+# Apple Sign In (special handling - requires frontend SDK)
+@app.route('/api/oauth/apple', methods=['POST'])
+def apple_oauth():
+    """Handle Apple Sign In (uses different flow with JWT)"""
+    data = request.json or {}
+    # Apple Sign In requires JWT verification
+    # For now, return a message that it needs proper JWT verification
+    # In production, you should verify the JWT token from Apple using their public keys
+    return jsonify({
+        'error': 'Apple Sign In requires JWT token verification. Please use Apple Sign In SDK on the frontend and send the verified identity token to this endpoint.'
+    }), 501
 
 if __name__ == '__main__':
     # Bind explicitly to 127.0.0.1:5000 to match Vite proxy default

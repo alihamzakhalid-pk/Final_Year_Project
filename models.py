@@ -9,7 +9,9 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), unique=True, nullable=False)
     email = db.Column(db.String(150), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(128), nullable=True)  # Nullable for OAuth users
+    oauth_provider = db.Column(db.String(50), nullable=True)  # 'google', 'facebook', 'microsoft', 'apple', 'github'
+    oauth_id = db.Column(db.String(255), nullable=True)  # Provider's user ID
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     chat_data = db.relationship('ChatData', backref='user', lazy=True)
 
@@ -17,6 +19,8 @@ class User(UserMixin, db.Model):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
+        if not self.password_hash:
+            return False
         return check_password_hash(self.password_hash, password)
 
     def __repr__(self):

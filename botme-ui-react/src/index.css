@@ -21,6 +21,9 @@
   ::selection {
     @apply bg-primary/30 text-slate-900;
   }
+  html.dark ::selection {
+    @apply bg-primary/40 text-slate-100;
+  }
 }
 
 @layer utilities {

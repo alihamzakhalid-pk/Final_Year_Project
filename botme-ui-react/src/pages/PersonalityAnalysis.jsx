@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
-import { 
-  MessageSquare, 
-  Smile, 
-  Clock, 
-  Activity, 
+import {
+  MessageSquare,
+  Smile,
+  Clock,
+  Activity,
   TrendingUp,
   Calendar,
   BarChart3,
   Brain,
-  ArrowLeft
 } from 'lucide-react'
 import UICard from '../components/ui/Card'
 import UIButton from '../components/ui/Button'
@@ -97,9 +96,8 @@ export default function PersonalityAnalysis() {
               <UIButton
                 onClick={() => navigate(`/chat/${chatId}`)}
                 variant="outline"
-                className="bg-white/10 backdrop-blur-lg border border-white/20 text-white hover:bg-white/20 flex items-center gap-2"
+                className="bg-white/10 backdrop-blur-lg border border-white/20 text-white hover:bg-white/20"
               >
-                <ArrowLeft className="h-4 w-4" />
                 Back to Chat
               </UIButton>
             </motion.div>

@@ -75,7 +75,53 @@ export function AuthProvider({ children }) {
     }
   }
 
-  const value = useMemo(() => ({ user, loading, login, verifyLogin, signup, verifySignup, logout }), [user, loading])
+  const requestPasswordReset = async (email) => {
+    if (!email) throw new Error('Email is required')
+    const { data } = await api.post('/api/request-password-reset', { email })
+    return data
+  }
+
+  const resetPassword = async ({ email, code, newPassword }) => {
+    const { data } = await api.post('/api/reset-password', { email, code, new_password: newPassword })
+    const token = data?.token || 'session'
+    localStorage.setItem('auth_token', token)
+    if (data?.user) {
+      setUser(data.user)
+    }
+    return data
+  }
+
+  const oauthLogin = async (provider) => {
+    try {
+      const { data } = await api.get(`/api/oauth/${provider}`)
+      if (data?.auth_url) {
+        // Redirect to OAuth provider
+        window.location.href = data.auth_url
+      } else {
+        throw new Error(data?.error || 'Failed to get OAuth URL')
+      }
+    } catch (error) {
+      // Handle different error formats
+      const errorMessage = error?.data?.error || error?.response?.data?.error || error?.message || `Failed to initiate ${provider} login`
+      throw new Error(errorMessage)
+    }
+  }
+
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      login,
+      verifyLogin,
+      signup,
+      verifySignup,
+      logout,
+      oauthLogin,
+      requestPasswordReset,
+      resetPassword,
+    }),
+    [user, loading],
+  )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

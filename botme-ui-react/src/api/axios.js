@@ -14,7 +14,11 @@ const applyInterceptors = (config) => {
 const resolveUrl = (url) => {
   if (!url) return baseURL
   if (isAbsoluteUrl(url)) return url
-  if (!baseURL) return url
+  // If no baseURL is set, use relative URL (will be proxied by Vite)
+  if (!baseURL) {
+    // Ensure URL starts with / for proper proxy routing
+    return url.startsWith('/') ? url : `/${url}`
+  }
   if (url.startsWith('/') && baseURL.endsWith('/')) {
     return `${baseURL.slice(0, -1)}${url}`
   }

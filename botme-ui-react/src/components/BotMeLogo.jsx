@@ -21,13 +21,14 @@ export default function BotMeLogo({
   animated = false,
   className = ''
 }) {
-  // Modern gradient color palette
+  // Modern color palette matching overall design
   const colors = {
-    primary: dark ? '#8B7FFF' : '#6C63FF',        // Soft purple
-    secondary: dark ? '#60A5FA' : '#3B82F6',      // Blue
-    accent: dark ? '#A78BFA' : '#8B5CF6',         // Purple accent
-    gradientStart: dark ? '#8B7FFF' : '#6C63FF',
-    gradientEnd: dark ? '#60A5FA' : '#3B82F6',
+    primary: '#5B7FFF',        // Blue
+    secondary: '#7C3AED',      // Purple
+    accent: '#0EA5E9',         // Cyan
+    gradientStart: '#5B7FFF',
+    gradientMid: '#6D5DFF',
+    gradientEnd: '#7C3AED',
     text: dark ? '#F3F4F6' : '#1F2937',
   }
 
@@ -42,7 +43,7 @@ export default function BotMeLogo({
     },
   } : {}
 
-  // Ultra modern icon - represents conversation threads and AI connection
+  // Modern chat bubble icon with gradient
   const LogoIcon = () => (
     <svg
       width={size}
@@ -55,71 +56,47 @@ export default function BotMeLogo({
       <defs>
         <linearGradient id={`botme-grad-main-${dark ? 'dark' : 'light'}`} x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor={colors.gradientStart} />
-          <stop offset="50%" stopColor={colors.gradientEnd} />
-          <stop offset="100%" stopColor={colors.gradientStart} />
+          <stop offset="50%" stopColor={colors.gradientMid} />
+          <stop offset="100%" stopColor={colors.gradientEnd} />
         </linearGradient>
-        <linearGradient id={`botme-grad-accent-${dark ? 'dark' : 'light'}`} x1="16" y1="16" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor={colors.accent} stopOpacity="0.8" />
-          <stop offset="100%" stopColor={colors.secondary} stopOpacity="0.6" />
-        </linearGradient>
+        <filter id={`botme-shadow-${dark ? 'dark' : 'light'}`}>
+          <feDropShadow dx="0" dy="2" stdDeviation="4" floodOpacity="0.15" />
+        </filter>
       </defs>
 
-      {/* Main conversation bubble - modern rounded shape */}
-      <path
-        d="M32 12C20.954 12 12 20.954 12 32C12 43.046 20.954 52 32 52C43.046 52 52 43.046 52 32C52 20.954 43.046 12 32 12Z"
+      {/* Modern rounded square chat bubble */}
+      <rect
+        x="12"
+        y="12"
+        width="40"
+        height="40"
+        rx="12"
         fill={`url(#botme-grad-main-${dark ? 'dark' : 'light'})`}
-        opacity={dark ? 0.95 : 1}
+        filter={`url(#botme-shadow-${dark ? 'dark' : 'light'})`}
       />
       
-      {/* Inner glow effect */}
-      <circle
-        cx="32"
-        cy="32"
-        r="18"
-        fill="none"
-        stroke="white"
-        strokeWidth="1.5"
-        opacity={dark ? 0.25 : 0.2}
+      {/* Inner highlight for depth */}
+      <rect
+        x="14"
+        y="14"
+        width="36"
+        height="36"
+        rx="10"
+        fill="white"
+        opacity="0.15"
       />
       
-      {/* Conversation threads - modern flowing lines */}
-      <path
-        d="M20 24C20 24 24 28 28 28C32 28 36 24 36 24"
-        stroke="white"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        fill="none"
-        opacity={dark ? 0.9 : 0.85}
-      />
-      
-      <path
-        d="M20 32C20 32 24 36 28 36C32 36 36 32 36 32"
-        stroke="white"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        fill="none"
-        opacity={dark ? 0.9 : 0.85}
-      />
-      
-      {/* AI connection point - central dot */}
-      <circle cx="32" cy="30" r="3.5" fill="white" opacity={dark ? 0.95 : 1} />
-      
-      {/* Memory/Data points - representing stored conversations */}
-      <circle cx="24" cy="26" r="2" fill="white" opacity={dark ? 0.7 : 0.6} />
-      <circle cx="40" cy="26" r="2" fill="white" opacity={dark ? 0.7 : 0.6} />
-      <circle cx="24" cy="34" r="2" fill="white" opacity={dark ? 0.7 : 0.6} />
-      <circle cx="40" cy="34" r="2" fill="white" opacity={dark ? 0.7 : 0.6} />
-      
-      {/* Subtle accent ring */}
-      <circle
-        cx="32"
-        cy="32"
-        r="22"
-        fill="none"
-        stroke={`url(#botme-grad-accent-${dark ? 'dark' : 'light'})`}
-        strokeWidth="1"
-        opacity={dark ? 0.3 : 0.25}
-      />
+      {/* Modern message lines - clean and minimal */}
+      <g fill="white" opacity={dark ? 0.95 : 1}>
+        {/* Top line - full width */}
+        <rect x="20" y="22" width="24" height="3" rx="1.5" />
+        {/* Middle line - medium width */}
+        <rect x="20" y="28" width="20" height="3" rx="1.5" />
+        {/* Bottom line - short width */}
+        <rect x="20" y="34" width="16" height="3" rx="1.5" />
+        {/* Chat indicator dot */}
+        <circle cx="48" cy="30" r="2.5" fill="white" opacity="0.8" />
+      </g>
     </svg>
   )
 
@@ -140,7 +117,7 @@ export default function BotMeLogo({
             style={{
               fontSize: `${size * 0.55}px`,
               letterSpacing: '-0.03em',
-              background: `linear-gradient(135deg, ${colors.gradientStart}, ${colors.gradientEnd})`,
+              background: `linear-gradient(135deg, ${colors.gradientStart}, ${colors.gradientMid}, ${colors.gradientEnd})`,
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',

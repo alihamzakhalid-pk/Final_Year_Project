@@ -66,14 +66,14 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-[#E5E7EB] bg-white shadow-sm">
+      <header className="sticky top-0 z-50 border-b border-[#E5E7EB] dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Logo + Home - Left */}
           <div className="flex items-center gap-6">
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
               <Link
                 to="/"
-                className="flex items-center gap-2 rounded-lg px-3 py-1.5 transition-all hover:bg-[#E8F0FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5B7FFF]/50"
+                className="flex items-center gap-2 rounded-lg px-3 py-1.5 transition-all hover:bg-[#E8F0FF] dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5B7FFF]/50"
               >
                 <Logo size={48} showText={true} />
               </Link>
@@ -83,11 +83,11 @@ export default function Navbar() {
             <nav className="hidden items-center gap-6 md:flex" aria-label="Primary">
               <NavLink
                 to="/"
-                className={({ isActive }) =>
+                  className={({ isActive }) =>
                   `relative text-sm font-medium tracking-tight transition-colors duration-200 focus:outline-none ${
                     isActive
                       ? 'text-[#5B7FFF] after:absolute after:-bottom-2 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-[#5B7FFF]'
-                      : 'text-[#6B7280] hover:text-[#5B7FFF]'
+                      : 'text-[#6B7280] dark:text-slate-300 hover:text-[#5B7FFF]'
                   }`
                 }
                 end
@@ -101,7 +101,7 @@ export default function Navbar() {
                     key={link.to}
                     to={link.to}
                     className={({ isActive }) =>
-                      `relative text-sm font-medium tracking-tight text-[#6B7280] transition-colors duration-200 hover:text-[#5B7FFF] focus-visible:text-[#5B7FFF] focus:outline-none ${
+                      `relative text-sm font-medium tracking-tight text-[#6B7280] dark:text-slate-300 transition-colors duration-200 hover:text-[#5B7FFF] focus-visible:text-[#5B7FFF] focus:outline-none ${
                         isActive
                           ? 'text-[#5B7FFF] after:absolute after:-bottom-2 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-[#5B7FFF]'
                           : ''
@@ -134,7 +134,7 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={() => setSearchOpen(true)}
-                className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-[#6B7280] transition-all hover:border-primary-300 hover:text-primary md:hidden"
+                className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-[#6B7280] dark:text-slate-300 transition-all hover:border-primary-300 hover:text-primary md:hidden"
               >
                 <Search className="h-4 w-4" />
               </button>
@@ -144,7 +144,7 @@ export default function Navbar() {
                 <button
                   type="button"
                   onClick={() => setNotificationsOpen(!notificationsOpen)}
-                  className="relative rounded-lg p-2 text-[#6B7280] transition-colors hover:bg-slate-100 hover:text-primary focus:visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                  className="relative rounded-lg p-2 text-[#6B7280] dark:text-slate-300 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-primary focus:visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                   aria-label="Notifications"
                 >
                   <Bell className="h-5 w-5" />
@@ -179,7 +179,7 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={() => navigate('/login')}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-[#1F2937] transition hover:border-[#5B7FFF] hover:text-[#5B7FFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B7FFF]/50"
+                className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm font-medium text-[#1F2937] dark:text-slate-200 transition hover:border-[#5B7FFF] hover:text-[#5B7FFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B7FFF]/50"
               >
                 Login
               </button>
@@ -195,16 +195,16 @@ export default function Navbar() {
             <div ref={menuRef} className="relative">
               <button
                 type="button"
-                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-[#1F2937] transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-[#1F2937] dark:text-slate-200 transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
                 onClick={() => setMenuOpen((prev) => !prev)}
               >
                 <Avatar name={user?.fullName || user?.username || 'User'} size={32} />
-                <span className="hidden max-w-[120px] truncate text-sm font-medium md:block text-[#1F2937]">
+                <span className="hidden max-w-[120px] truncate text-sm font-medium md:block text-[#1F2937] dark:text-slate-200">
                   {user?.fullName || user?.username || 'User'}
                 </span>
-                <ChevronDown className="h-4 w-4 text-[#6B7280]" />
+                <ChevronDown className="h-4 w-4 text-[#6B7280] dark:text-slate-400" />
               </button>
               <AnimatePresence>
                 {menuOpen && (
@@ -272,7 +272,7 @@ export default function Navbar() {
 
           <button
             type="button"
-            className="inline-flex items-center justify-center rounded-lg border border-transparent p-2 text-[#6B7280] transition hover:text-[#5B7FFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B7FFF]/50 md:hidden"
+            className="inline-flex items-center justify-center rounded-lg border border-transparent p-2 text-[#6B7280] dark:text-slate-300 transition hover:text-[#5B7FFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B7FFF]/50 md:hidden"
             onClick={() => setMobileOpen((prev) => !prev)}
             aria-label="Toggle navigation"
           >
@@ -288,18 +288,18 @@ export default function Navbar() {
           exit={{ opacity: 0, height: 0 }}
           className="md:hidden"
         >
-          <nav className="space-y-1 border-t border-slate-200 bg-white px-4 py-4 text-sm" aria-label="Mobile">
+          <nav className="space-y-1 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-4 text-sm" aria-label="Mobile">
             {navLinks
               .filter((link) => !link.authOnly || Boolean(user))
               .map((link) => (
                 <NavLink
                   key={link.to}
                   to={link.to}
-                  className={({ isActive }) =>
+                    className={({ isActive }) =>
                     `block rounded-lg px-3 py-2 font-medium tracking-tight transition ${
                       isActive
-                        ? 'bg-[#E8F0FF] text-[#5B7FFF]'
-                        : 'text-[#6B7280] hover:bg-[#E8F0FF] hover:text-[#5B7FFF]'
+                        ? 'bg-[#E8F0FF] dark:bg-slate-800 text-[#5B7FFF]'
+                        : 'text-[#6B7280] dark:text-slate-300 hover:bg-[#E8F0FF] dark:hover:bg-slate-800 hover:text-[#5B7FFF]'
                     }`
                   }
                   end={link.to === '/'}

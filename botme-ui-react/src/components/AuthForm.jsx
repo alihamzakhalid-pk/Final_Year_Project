@@ -188,12 +188,12 @@ export default function AuthForm({ mode = 'login', onSubmit, disabled = false })
             />
             Remember me
           </label>
-          <a
-            href="#"
+          <Link
+            to="/forgot-password"
             className="font-medium text-primary-600 transition hover:text-primary-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-surface dark:text-primary-400"
           >
             Forgot password?
-          </a>
+          </Link>
         </div>
       )}
 
