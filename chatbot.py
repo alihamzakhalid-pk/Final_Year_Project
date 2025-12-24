@@ -82,6 +82,8 @@ def get_chatbot_response(chat_data_id, user_input):
     except (json.JSONDecodeError, TypeError):
         person_msgs = []
 
+    person_msgs = person_msgs[:300]
+
     if not person_msgs:
         return f"Error: No example messages found for {selected_person}. Please upload a valid chat."
 

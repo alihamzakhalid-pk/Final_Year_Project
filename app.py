@@ -18,6 +18,12 @@ from personality_analysis import analyze_personality
 from datetime import datetime, timedelta
 from oauth_handler import get_oauth_auth_url, exchange_oauth_code, get_or_create_oauth_user
 
+from rag_chatbot import (
+    get_chatbot_response_rag,  # NEW RAG SYSTEM
+    create_vector_store,
+    delete_vector_store
+)
+
 app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
@@ -358,7 +364,7 @@ def chat(chat_id):
     
     return render_template('chat.html', chat_id=chat_id, person=chat_data.selected_person)
 
-@app.route('/api/chat/<int:chat_id>', methods=['POST'])
+'''@app.route('/api/chat/<int:chat_id>', methods=['POST'])
 @app.route('/api/chat/<int:chat_id>/message', methods=['POST'])  # Alias for backward compatibility
 @login_required
 def api_chat(chat_id):
@@ -385,6 +391,7 @@ def api_chat(chat_id):
         import traceback
         print(f"Chatbot error: {traceback.format_exc()}")
         return jsonify({'error': f'Failed to generate response: {str(e)}'}), 500
+'''
 
 # Simple health check endpoint
 @app.route('/api/health', methods=['GET'])
@@ -772,9 +779,15 @@ def api_select_person():
     selected_msgs = all_messages_dict.get(person_name, [])
     if not selected_msgs:
         return jsonify({'error': 'No messages found for selected person'}), 400
-    selected_msgs = selected_msgs[:300]
+    # NEW: Store ALL messages for RAG, but mark we're using full dataset
+    all_msgs_for_rag = selected_msgs  # Keep all messages
+    first_300_for_old = selected_msgs[:300]  # First 300 for OLD system
+    
+    # Store ALL messages for RAG to search through
+    temp_chat.messages = json.dumps(all_msgs_for_rag)
+    # ================================
+    
     temp_chat.selected_person = person_name
-    temp_chat.messages = json.dumps(selected_msgs)
     temp_chat.conversation_history = '[]'
     temp_chat.is_temp = False
     temp_chat.all_messages = ''
@@ -782,6 +795,18 @@ def api_select_person():
     db.session.refresh(temp_chat)
     
     print(f"[SELECT_PERSON] Chat {chat_id} configured with person '{person_name}', is_temp={temp_chat.is_temp}")
+    print(f"[SELECT_PERSON] Stored {len(all_msgs_for_rag)} messages for RAG")
+    
+    # ===== RAG: CREATE VECTOR STORE =====
+    try:
+        print(f"[SELECT_PERSON] Creating RAG vector store for chat {chat_id}...")
+        create_vector_store(temp_chat)
+        print(f"[SELECT_PERSON] ✅ RAG vector store created successfully")
+    except Exception as e:
+        print(f"[SELECT_PERSON] ⚠️ Warning: Failed to create RAG vector store: {e}")
+        print(f"[SELECT_PERSON] Chat will still work with old system")
+    # =====================================
+
     return jsonify({'chat_id': chat_id, 'person': person_name, 'status': 'ready'})
 
 
@@ -884,6 +909,75 @@ def api_chat_context(chat_id):
         'participants': participants
     })
 
+@app.route('/api/chat/<int:chat_id>', methods=['POST'])
+@app.route('/api/chat/<int:chat_id>/message', methods=['POST'])  # Alias for backward compatibility
+@login_required
+def api_chat(chat_id):
+    """
+    OLD SYSTEM: Original chatbot endpoint (uses first 300 messages in prompt)
+    Kept for backward compatibility and comparison with RAG system
+    """
+    data = request.json or {}
+    user_input = data.get('message')
+    if not user_input:
+        return jsonify({'error': 'No message provided'}), 400
+    
+    # Verify chat exists and belongs to user
+    chat = ChatData.query.filter_by(id=chat_id, user_id=current_user.id, is_temp=False).first()
+    if not chat:
+        exists_for_other = ChatData.query.filter_by(id=chat_id).first()
+        if exists_for_other:
+            return jsonify({'error': 'You do not have permission to send messages to this chat'}), 403
+        return jsonify({'error': f'Chat with ID {chat_id} not found or not ready. Please select a persona first.'}), 404
+    
+    if not chat.selected_person:
+        return jsonify({'error': 'No persona selected for this chat. Please go back and select a persona.'}), 400
+    
+    try:
+        print(f"\n[API] OLD SYSTEM endpoint called for chat {chat_id}")
+        response = get_chatbot_response(chat_id, user_input)
+        return jsonify({'response': response, 'source': 'standard'})
+    except Exception as e:
+        import traceback
+        print(f"[API] Chatbot error: {traceback.format_exc()}")
+        return jsonify({'error': f'Failed to generate response: {str(e)}'}), 500
+
+
+@app.route('/api/chat/<int:chat_id>/rag', methods=['POST'])
+@login_required
+def api_chat_rag(chat_id):
+    """
+    NEW RAG SYSTEM: RAG-powered chatbot endpoint (retrieves relevant messages)
+    Use this endpoint to test RAG vs standard system
+    """
+    data = request.json or {}
+    user_input = data.get('message')
+    
+    if not user_input:
+        return jsonify({'error': 'No message provided'}), 400
+    
+    # Verify chat exists and belongs to user
+    chat = ChatData.query.filter_by(id=chat_id, user_id=current_user.id, is_temp=False).first()
+    if not chat:
+        exists_for_other = ChatData.query.filter_by(id=chat_id).first()
+        if exists_for_other:
+            return jsonify({'error': 'You do not have permission to send messages to this chat'}), 403
+        return jsonify({'error': f'Chat with ID {chat_id} not found or not ready. Please select a persona first.'}), 404
+    
+    if not chat.selected_person:
+        return jsonify({'error': 'No persona selected for this chat. Please go back and select a persona.'}), 400
+    
+    try:
+        print(f"\n[API] RAG SYSTEM endpoint called for chat {chat_id}")
+        response = get_chatbot_response_rag(chat_id, user_input)
+        return jsonify({'response': response, 'source': 'rag'})
+    except Exception as e:
+        import traceback
+        print(f"[API] RAG chatbot error: {traceback.format_exc()}")
+        return jsonify({'error': f'Failed to generate response: {str(e)}'}), 500
+
+# =========================================
+
 
 @app.route('/api/personas', methods=['GET'])
 @login_required
@@ -922,6 +1016,16 @@ def api_delete_chat(chat_id):
     chat = ChatData.query.filter_by(id=chat_id, user_id=current_user.id).first()
     if not chat:
         return jsonify({'error': 'Chat not found'}), 404
+    
+    # ===== RAG: DELETE VECTOR STORE =====
+    try:
+        print(f"[DELETE] Deleting RAG vector store for chat {chat_id}...")
+        delete_vector_store(chat_id)
+        print(f"[DELETE] ✅ Vector store deleted")
+    except Exception as e:
+        print(f"[DELETE] ⚠️ Warning: Failed to delete vector store: {e}")
+    # ====================================
+
     db.session.delete(chat)
     db.session.commit()
     return jsonify({'message': 'Chat deleted successfully'})
@@ -932,6 +1036,16 @@ def api_delete_account():
     """Delete user account and all associated data"""
     try:
         user = current_user
+
+        # ===== RAG: DELETE ALL VECTOR STORES FOR USER =====
+        user_chats = ChatData.query.filter_by(user_id=user.id).all()
+        for chat in user_chats:
+            try:
+                print(f"[DELETE ACCOUNT] Deleting vector store for chat {chat.id}...")
+                delete_vector_store(chat.id)
+            except Exception as e:
+                print(f"[DELETE ACCOUNT] Warning: Failed to delete vector store {chat.id}: {e}")
+        # ==================================================
         
         # Delete all chat data associated with the user
         ChatData.query.filter_by(user_id=user.id).delete()

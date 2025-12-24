@@ -1,18 +1,38 @@
-# Environment variables
-.env
-
-# Virtual environment
-venv/
-BotMe1/
-
-# Python cache
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
 
-# Database file
-botme.db
+# Flask
+instance/
+.env
+*.db
 
-# macOS folder attributes
-.DS_Store
+# Frontend
+botme-ui-react/node_modules/
+botme-ui-react/dist/
+botme-ui-react/.vite/
 
+# RAG
+chroma_db/
+*.index
+*.pkl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
 new.txt
+output.txt
+flask_session/
+check_message_count.py
+debug_chats.py
+test_rag_manually.py
