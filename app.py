@@ -26,8 +26,9 @@ from rag_chatbot import (
 app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
- # Enable CORS for SPA (adjust origin as needed for production)
-# Allow localhost, 127.0.0.1, and LAN IPs on port 5173 during dev
+
+# Enable CORS for SPA - supports both development and production
+frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 CORS(
     app,
     resources={r"/api/*": {
@@ -35,6 +36,13 @@ CORS(
             r"http://localhost:5173",
             r"http://127.0.0.1:5173",
             r"http://192\.168\.[0-9]{1,3}\.[0-9]{1,3}:5173",
+            frontend_url,  # Production frontend URL
+        ]
+    }, r"/auth/*": {
+        "origins": [
+            r"http://localhost:5173",
+            r"http://127.0.0.1:5173",
+            frontend_url,
         ]
     }},
     supports_credentials=True,
