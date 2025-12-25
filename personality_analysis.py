@@ -134,15 +134,27 @@ def count_emojis(text):
 
 
 def analyze_sentiment(messages):
-    """Basic sentiment analysis"""
+    """Improved sentiment analysis with better word matching"""
+    if not messages:
+        return {'positive': 33, 'neutral': 34, 'negative': 33}
+    
     positive_count = 0
     negative_count = 0
     neutral_count = 0
     
     for msg in messages:
         msg_lower = msg.lower()
-        positive_score = sum(1 for word in POSITIVE_WORDS if word in msg_lower)
-        negative_score = sum(1 for word in NEGATIVE_WORDS if word in msg_lower)
+        words_in_msg = set(re.findall(r'\b\w+\b', msg_lower))
+        
+        # Count word matches (using word boundaries for accuracy)
+        positive_score = len(words_in_msg.intersection(POSITIVE_WORDS))
+        negative_score = len(words_in_msg.intersection(NEGATIVE_WORDS))
+        
+        # Also check for common expressions
+        if any(expr in msg_lower for expr in ['haha', 'lol', '😊', '❤️', '👍', '😂', 'mast', 'badiya']):
+            positive_score += 1
+        if any(expr in msg_lower for expr in ['😢', '😡', '😠', 'ugh', 'hate']):
+            negative_score += 1
         
         if positive_score > negative_score:
             positive_count += 1
@@ -152,8 +164,6 @@ def analyze_sentiment(messages):
             neutral_count += 1
     
     total = len(messages)
-    if total == 0:
-        return {'positive': 0, 'neutral': 0, 'negative': 0}
     
     return {
         'positive': round((positive_count / total) * 100, 1),
@@ -291,7 +301,7 @@ def calculate_vocabulary_richness(messages):
 
 
 def estimate_personality_traits(messages):
-    """Estimate Big Five personality traits based on message patterns"""
+    """Estimate Big Five personality traits based on message patterns - IMPROVED VERSION"""
     if not messages:
         return {
             'openness': 50,
@@ -301,62 +311,114 @@ def estimate_personality_traits(messages):
             'emotional_stability': 50
         }
     
-    # Openness indicators: creative words, questions, diverse vocabulary - English and Roman Urdu
+    total_messages = len(messages)
+    
+    # ========== OPENNESS ==========
+    # Creative thinking, curiosity, imagination, variety in vocabulary
     creative_words = [
-        # English
         'creative', 'imagine', 'idea', 'think', 'wonder', 'curious', 'explore', 'new', 'different',
-        'innovative', 'creative', 'artistic', 'imagination', 'ideas', 'thinking', 'wondering',
-        # Roman Urdu
-        'soch', 'sochna', 'khayal', 'khayalat', 'naya', 'naye', 'nayi', 'alag', 'different',
-        'creative', 'imagine', 'idea', 'think', 'wonder', 'curious', 'explore'
+        'innovative', 'unique', 'interesting', 'amazing', 'discover', 'learn', 'try',
+        'soch', 'sochna', 'khayal', 'naya', 'alag', 'amazing', 'interesting', 'philosophy',
+        'art', 'music', 'book', 'movie', 'film', 'story', 'dream', 'beautiful', 'khoobsurat'
     ]
-    openness_score = sum(1 for msg in messages for word in creative_words if word in msg.lower())
-    openness = min(100, 50 + (openness_score / len(messages)) * 30)
+    question_marks = sum(msg.count('?') for msg in messages)
+    creative_matches = sum(1 for msg in messages if any(word in msg.lower() for word in creative_words))
     
-    # Conscientiousness: organized language, planning words, punctuality indicators - English and Roman Urdu
+    # Calculate vocabulary diversity as openness indicator
+    all_words = []
+    for msg in messages:
+        words = re.findall(r'\b\w+\b', msg.lower())
+        all_words.extend([w for w in words if w not in STOP_WORDS and len(w) > 2])
+    vocab_diversity = len(set(all_words)) / max(len(all_words), 1) * 100
+    
+    openness_pct = (creative_matches / total_messages) * 100
+    question_pct = min((question_marks / total_messages) * 20, 15)  # Cap at 15
+    openness = 30 + (openness_pct * 2) + question_pct + (vocab_diversity * 0.3)
+    openness = min(95, max(25, openness))
+    
+    # ========== CONSCIENTIOUSNESS ==========
+    # Planning, organization, punctuality, completing tasks
     organized_words = [
-        # English
         'plan', 'schedule', 'organize', 'prepare', 'complete', 'finish', 'done', 'ready',
-        'planned', 'planning', 'organized', 'prepared', 'completed', 'finished',
-        # Roman Urdu
-        'plan', 'planning', 'taiyar', 'taiyari', 'mukammal', 'khatam', 'ho gaya', 'ho gayi',
-        'ready', 'taiyar hai', 'plan hai', 'schedule', 'time', 'waqt', 'samay'
+        'time', 'deadline', 'task', 'work', 'submit', 'assignment', 'meeting', 'appointment',
+        'taiyar', 'khatam', 'complete', 'ready', 'time', 'waqt', 'kal', 'tomorrow', 'today',
+        'abhi', 'jaldi', 'late', 'on time', 'remind', 'remember', 'important', 'urgent'
     ]
-    conscientiousness_score = sum(1 for msg in messages for word in organized_words if word in msg.lower())
-    conscientiousness = min(100, 50 + (conscientiousness_score / len(messages)) * 30)
+    # Proper punctuation and capitalization indicates conscientiousness
+    proper_punctuation = sum(1 for msg in messages if msg.rstrip().endswith(('.', '!', '?')))
+    organized_matches = sum(1 for msg in messages if any(word in msg.lower() for word in organized_words))
     
-    # Extraversion: social words, exclamation marks, emojis, enthusiasm - English and Roman Urdu
+    cons_pct = (organized_matches / total_messages) * 100
+    punctuation_pct = (proper_punctuation / total_messages) * 100
+    conscientiousness = 35 + (cons_pct * 2.5) + (punctuation_pct * 0.15)
+    conscientiousness = min(95, max(25, conscientiousness))
+    
+    # ========== EXTRAVERSION ==========
+    # Social engagement, enthusiasm, expressiveness
     social_words = [
-        # English
-        'friend', 'party', 'meet', 'together', 'fun', 'excited', 'happy', 'great',
-        'friends', 'friendship', 'meeting', 'together', 'funny', 'excitement', 'happiness',
-        # Roman Urdu
-        'dost', 'dosto', 'yaar', 'yaara', 'sath', 'sath mein', 'maza', 'mazay', 'khushi',
-        'khush', 'excited', 'happy', 'great', 'mast', 'badiya', 'zabardast', 'wah',
-        'party', 'meet', 'milna', 'milenge', 'milogi', 'miloge', 'fun', 'enjoy'
+        'friend', 'party', 'meet', 'together', 'fun', 'excited', 'happy', 'great', 'love',
+        'hang out', 'going out', 'club', 'concert', 'event', 'gathering', 'everyone',
+        'dost', 'yaar', 'yaara', 'sath', 'maza', 'mazay', 'khushi', 'khush', 'excited',
+        'party', 'milna', 'milenge', 'mast', 'badiya', 'zabardast', 'wah', 'awesome',
+        'haha', 'lol', 'hehe', 'rofl', 'lmao'
     ]
     exclamation_count = sum(msg.count('!') for msg in messages)
     emoji_count = sum(len(EMOJI_PATTERN.findall(msg)) for msg in messages)
-    extraversion_score = sum(1 for msg in messages for word in social_words if word in msg.lower())
-    extraversion = min(100, 50 + ((extraversion_score + exclamation_count * 0.5 + emoji_count * 0.3) / len(messages)) * 25)
+    caps_words = sum(1 for msg in messages for word in msg.split() if word.isupper() and len(word) > 1)
+    social_matches = sum(1 for msg in messages if any(word in msg.lower() for word in social_words))
     
-    # Agreeableness: polite words, positive sentiment, cooperation - English and Roman Urdu
+    extra_pct = (social_matches / total_messages) * 100
+    exclaim_pct = min((exclamation_count / total_messages) * 10, 20)  # Cap contribution
+    emoji_pct = min((emoji_count / total_messages) * 8, 15)  # Cap contribution
+    extraversion = 30 + (extra_pct * 2) + exclaim_pct + emoji_pct
+    extraversion = min(95, max(20, extraversion))
+    
+    # ========== AGREEABLENESS ==========
+    # Politeness, cooperation, empathy, kindness
     polite_words = [
-        # English
-        'please', 'thank', 'sorry', 'appreciate', 'help', 'support', 'care', 'kind',
-        'thanks', 'thank you', 'appreciate', 'appreciated', 'helpful', 'supportive', 'caring', 'kindness',
-        # Roman Urdu
-        'shukriya', 'shukria', 'dhanyawad', 'sorry', 'maaf', 'maaf karo', 'maaf kijiye',
-        'madad', 'help', 'support', 'care', 'parwah', 'dekh bhal', 'kind', 'meherban',
-        'aap', 'aapka', 'aapki', 'aapke', 'respect', 'respect karta', 'respect karti'
+        'please', 'thank', 'thanks', 'sorry', 'appreciate', 'help', 'support', 'care',
+        'kind', 'nice', 'welcome', 'glad', 'sure', 'no problem', 'of course', 'happy to',
+        'shukriya', 'shukria', 'dhanyawad', 'sorry', 'maaf', 'madad', 'help', 'zaroor',
+        'bilkul', 'haan', 'ok', 'theek hai', 'koi baat nahi', 'np', 'np bro', 'sure'
     ]
-    agreeableness_score = sum(1 for msg in messages for word in polite_words if word in msg.lower())
-    sentiment = analyze_sentiment(messages)
-    agreeableness = min(100, 50 + ((agreeableness_score / len(messages)) * 20) + (sentiment['positive'] * 0.3))
+    # Shorter responses can indicate agreeableness (accommodating, not argumentative)
+    agreement_words = ['yes', 'ok', 'okay', 'sure', 'alright', 'haan', 'ji', 'theek', 'sahi', 'bilkul', 'zaroor']
     
-    # Emotional Stability: consistent tone, low negative sentiment, calm language
-    negative_sentiment = sentiment['negative']
-    emotional_stability = max(0, 100 - (negative_sentiment * 1.5))
+    polite_matches = sum(1 for msg in messages if any(word in msg.lower() for word in polite_words))
+    agreement_matches = sum(1 for msg in messages if any(word in msg.lower() for word in agreement_words))
+    
+    agree_pct = (polite_matches / total_messages) * 100
+    agreement_pct = (agreement_matches / total_messages) * 100
+    
+    # Get sentiment for agreeableness
+    sentiment = analyze_sentiment(messages)
+    positive_boost = sentiment['positive'] * 0.3
+    
+    agreeableness = 35 + (agree_pct * 1.5) + (agreement_pct * 0.8) + positive_boost
+    agreeableness = min(95, max(25, agreeableness))
+    
+    # ========== EMOTIONAL STABILITY (Neuroticism inverted) ==========
+    # Calm, consistent, low anxiety/stress
+    negative_emotion_words = [
+        'sad', 'angry', 'upset', 'worried', 'stressed', 'anxious', 'nervous', 'frustrated',
+        'annoyed', 'tired', 'exhausted', 'hate', 'terrible', 'awful', 'problem', 'issue',
+        'dukh', 'gham', 'pareshan', 'tension', 'gussa', 'thak', 'mushkil', 'takleef',
+        'bura', 'kharab', 'naraz', 'udaas', 'crying', 'cry'
+    ]
+    calm_words = [
+        'calm', 'relax', 'peaceful', 'chill', 'easy', 'fine', 'good', 'great', 'okay',
+        'no worries', 'all good', 'no problem', 'theek', 'sab theek', 'accha', 'mast'
+    ]
+    
+    negative_matches = sum(1 for msg in messages if any(word in msg.lower() for word in negative_emotion_words))
+    calm_matches = sum(1 for msg in messages if any(word in msg.lower() for word in calm_words))
+    
+    negative_pct = (negative_matches / total_messages) * 100
+    calm_pct = (calm_matches / total_messages) * 100
+    
+    # High stability = low negative, high calm
+    emotional_stability = 70 - (negative_pct * 1.5) + (calm_pct * 0.5)
+    emotional_stability = min(95, max(20, emotional_stability))
     
     return {
         'openness': round(openness, 1),

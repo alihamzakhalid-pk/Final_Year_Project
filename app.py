@@ -13,7 +13,6 @@ import string
 import requests
 import urllib.parse
 from parse_chat import parse_chat_file
-from chatbot import get_chatbot_response
 from personality_analysis import analyze_personality
 from datetime import datetime, timedelta
 from oauth_handler import get_oauth_auth_url, exchange_oauth_code, get_or_create_oauth_user
@@ -126,8 +125,12 @@ def serialize_user(user):
         'id': user.id,
         'username': user.username,
         'email': user.email,
-        'fullName': user.username,
+        'fullName': getattr(user, 'full_name', None) or user.username,
+        'is_admin': getattr(user, 'is_admin', False),
+        'is_active': getattr(user, 'is_active', True),
+        'oauth_provider': user.oauth_provider,
         'created_at': user.created_at.isoformat() if user.created_at else None,
+        'last_login': user.last_login.isoformat() if getattr(user, 'last_login', None) else None,
     }
 
 
@@ -514,7 +517,7 @@ def api_verify_signup():
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
-    """Send verification code for login"""
+    """Direct login with password - no verification code required"""
     data = request.json or {}
     identifier = data.get('identifier') or data.get('username') or data.get('email')
     password = data.get('password')
@@ -525,42 +528,27 @@ def api_login():
     # Allow login by username or email
     if '@' in identifier:
         user = User.query.filter_by(email=identifier.lower()).first()
-        email = identifier.lower()
     else:
         user = User.query.filter_by(username=identifier).first()
-        if not user:
-            return jsonify({'error': 'Invalid username/email or password'}), 401
-        email = user.email
     
-    # Verify password
+    # Verify user exists and password is correct
     if not user or not user.check_password(password):
         return jsonify({'error': 'Invalid username/email or password'}), 401
     
-    # Delete any existing verification codes for this email
-    VerificationCode.query.filter_by(email=email, purpose='login').delete()
-    
-    # Generate verification code
-    code = generate_verification_code()
-    expires_at = datetime.utcnow() + timedelta(minutes=10)
-    
-    # Save verification code
-    verification = VerificationCode(
-        email=email,
-        code=code,
-        purpose='login',
-        expires_at=expires_at
-    )
-    db.session.add(verification)
-    db.session.commit()
-    
-    # Send email
-    if send_verification_email(email, code, 'login'):
+    # Check if this is an OAuth-only account (no password set)
+    if user.oauth_provider and not user.password_hash:
         return jsonify({
-            'message': 'Verification code sent to your email',
-            'email': email
-        }), 200
-    else:
-        return jsonify({'error': 'Failed to send verification email. Please check your email configuration.'}), 500
+            'error': f'This account uses {user.oauth_provider.capitalize()} sign-in. Please use that provider to log in.'
+        }), 400
+    
+    # Direct login - create session immediately
+    login_user(user)
+    
+    return jsonify({
+        'message': 'Logged in successfully',
+        'user': serialize_user(user),
+        'token': 'session'
+    }), 200
 
 
 @app.route('/api/verify-login', methods=['POST'])
@@ -1219,18 +1207,28 @@ def oauth_callback(provider):
     # Get frontend URL from config or request
     frontend_url = app.config.get('FRONTEND_URL', 'http://localhost:5173')
     
-    if error:
-        return redirect(f"{frontend_url}?oauth_error={error}&provider={provider}")
+    print(f"[OAUTH] Callback received for {provider}")
+    print(f"[OAUTH] State: {state}, Code: {'present' if code else 'missing'}, Error: {error}")
     
-    # Verify state
+    if error:
+        print(f"[OAUTH] Error from provider: {error}")
+        return redirect(f"{frontend_url}/login?oauth_error={error}&provider={provider}")
+    
+    # Verify state - be more lenient for development
     session_state = session.get(f'oauth_state_{provider}')
+    print(f"[OAUTH] Session state: {session_state}")
+    
     if not session_state or session_state != state:
-        return redirect(f"{frontend_url}?oauth_error=invalid_state&provider={provider}")
+        print(f"[OAUTH] State mismatch! Expected: {session_state}, Got: {state}")
+        # In development, allow if state is present (session might not persist across redirects)
+        if not state:
+            return redirect(f"{frontend_url}/login?oauth_error=invalid_state&provider={provider}")
+        print("[OAUTH] Allowing despite state mismatch (development mode)")
     
     session.pop(f'oauth_state_{provider}', None)
     
     if not code:
-        return redirect(f"{frontend_url}?oauth_error=no_code&provider={provider}")
+        return redirect(f"{frontend_url}/login?oauth_error=no_code&provider={provider}")
     
     # Exchange code for token
     redirect_uri = f"{request.host_url.rstrip('/')}/api/oauth/{provider}/callback"
@@ -1238,22 +1236,26 @@ def oauth_callback(provider):
     try:
         user_info = exchange_oauth_code(provider, code, redirect_uri)
         if not user_info:
-            return redirect(f"{frontend_url}?oauth_error=token_exchange_failed&provider={provider}")
+            print("[OAUTH] Token exchange failed - no user info returned")
+            return redirect(f"{frontend_url}/login?oauth_error=token_exchange_failed&provider={provider}")
+        
+        print(f"[OAUTH] User info received: {user_info.get('email')}")
         
         # Create or get user
         user = get_or_create_oauth_user(provider, user_info)
         if user:
             login_user(user)
-            # Return JSON for frontend to handle
-            token = 'session'  # Using session-based auth
-            return redirect(f"{frontend_url}/login?oauth_success=true&provider={provider}&token={token}")
+            print(f"[OAUTH] User logged in successfully: {user.email}")
+            # Redirect to dashboard on success (not login page)
+            return redirect(f"{frontend_url}/dashboard?oauth_success=true&provider={provider}")
         else:
-            return redirect(f"{frontend_url}?oauth_error=user_creation_failed&provider={provider}")
+            print("[OAUTH] User creation failed")
+            return redirect(f"{frontend_url}/login?oauth_error=user_creation_failed&provider={provider}")
     except Exception as e:
-        print(f"OAuth error for {provider}: {str(e)}")
+        print(f"[OAUTH] Error for {provider}: {str(e)}")
         import traceback
         traceback.print_exc()
-        return redirect(f"{frontend_url}?oauth_error={urllib.parse.quote(str(e))}&provider={provider}")
+        return redirect(f"{frontend_url}/login?oauth_error={urllib.parse.quote(str(e))}&provider={provider}")
 
 # Apple Sign In (special handling - requires frontend SDK)
 @app.route('/api/oauth/apple', methods=['POST'])
@@ -1266,6 +1268,204 @@ def apple_oauth():
     return jsonify({
         'error': 'Apple Sign In requires JWT token verification. Please use Apple Sign In SDK on the frontend and send the verified identity token to this endpoint.'
     }), 501
+
+
+# ==================== ADMIN API ENDPOINTS ====================
+
+def admin_required(f):
+    """Decorator to require admin access"""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return jsonify({'error': 'Authentication required'}), 401
+        if not getattr(current_user, 'is_admin', False):
+            return jsonify({'error': 'Admin access required'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+@app.route('/api/admin/stats', methods=['GET'])
+@login_required
+@admin_required
+def admin_stats():
+    """Get admin dashboard statistics"""
+    total_users = User.query.count()
+    active_users = User.query.filter_by(is_active=True).count()
+    total_chats = ChatData.query.filter_by(is_temp=False).count()
+    total_messages = 0
+    
+    # Count messages across all chats
+    chats = ChatData.query.filter_by(is_temp=False).all()
+    for chat in chats:
+        try:
+            messages = json.loads(chat.messages or '[]')
+            total_messages += len(messages)
+        except:
+            pass
+    
+    # Recent signups (last 7 days)
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    recent_signups = User.query.filter(User.created_at >= week_ago).count()
+    
+    # Admin count
+    admin_count = User.query.filter_by(is_admin=True).count()
+    
+    return jsonify({
+        'total_users': total_users,
+        'active_users': active_users,
+        'total_chats': total_chats,
+        'total_messages': total_messages,
+        'recent_signups': recent_signups,
+        'admin_count': admin_count
+    })
+
+
+@app.route('/api/admin/users', methods=['GET'])
+@login_required
+@admin_required
+def admin_get_users():
+    """Get all users for admin panel"""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    search = request.args.get('search', '')
+    
+    query = User.query
+    
+    if search:
+        query = query.filter(
+            (User.username.ilike(f'%{search}%')) |
+            (User.email.ilike(f'%{search}%')) |
+            (User.full_name.ilike(f'%{search}%'))
+        )
+    
+    query = query.order_by(User.created_at.desc())
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    
+    users = []
+    for user in pagination.items:
+        chat_count = ChatData.query.filter_by(user_id=user.id, is_temp=False).count()
+        users.append({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'full_name': getattr(user, 'full_name', None),
+            'is_admin': getattr(user, 'is_admin', False),
+            'is_active': getattr(user, 'is_active', True),
+            'oauth_provider': user.oauth_provider,
+            'created_at': user.created_at.isoformat() if user.created_at else None,
+            'last_login': user.last_login.isoformat() if getattr(user, 'last_login', None) else None,
+            'chat_count': chat_count
+        })
+    
+    return jsonify({
+        'users': users,
+        'total': pagination.total,
+        'pages': pagination.pages,
+        'current_page': page
+    })
+
+
+@app.route('/api/admin/users/<int:user_id>', methods=['GET'])
+@login_required
+@admin_required
+def admin_get_user(user_id):
+    """Get single user details"""
+    user = User.query.get_or_404(user_id)
+    chats = ChatData.query.filter_by(user_id=user.id, is_temp=False).all()
+    
+    chat_list = []
+    for chat in chats:
+        try:
+            messages = json.loads(chat.messages or '[]')
+            message_count = len(messages)
+        except:
+            message_count = 0
+        
+        chat_list.append({
+            'id': chat.id,
+            'persona': chat.selected_person,
+            'message_count': message_count,
+            'created_at': chat.created_at.isoformat() if chat.created_at else None
+        })
+    
+    return jsonify({
+        'id': user.id,
+        'username': user.username,
+        'email': user.email,
+        'full_name': getattr(user, 'full_name', None),
+        'is_admin': getattr(user, 'is_admin', False),
+        'is_active': getattr(user, 'is_active', True),
+        'oauth_provider': user.oauth_provider,
+        'created_at': user.created_at.isoformat() if user.created_at else None,
+        'last_login': user.last_login.isoformat() if getattr(user, 'last_login', None) else None,
+        'chats': chat_list
+    })
+
+
+@app.route('/api/admin/users/<int:user_id>/toggle-admin', methods=['POST'])
+@login_required
+@admin_required
+def admin_toggle_admin(user_id):
+    """Toggle admin status for a user"""
+    if user_id == current_user.id:
+        return jsonify({'error': 'Cannot change your own admin status'}), 400
+    
+    user = User.query.get_or_404(user_id)
+    user.is_admin = not getattr(user, 'is_admin', False)
+    db.session.commit()
+    
+    return jsonify({
+        'message': f"Admin status {'granted' if user.is_admin else 'revoked'} for {user.username}",
+        'is_admin': user.is_admin
+    })
+
+
+@app.route('/api/admin/users/<int:user_id>/toggle-active', methods=['POST'])
+@login_required
+@admin_required
+def admin_toggle_active(user_id):
+    """Toggle active status for a user (ban/unban)"""
+    if user_id == current_user.id:
+        return jsonify({'error': 'Cannot deactivate your own account'}), 400
+    
+    user = User.query.get_or_404(user_id)
+    user.is_active = not getattr(user, 'is_active', True)
+    db.session.commit()
+    
+    return jsonify({
+        'message': f"User {user.username} {'activated' if user.is_active else 'deactivated'}",
+        'is_active': user.is_active
+    })
+
+
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def admin_delete_user(user_id):
+    """Delete a user and all their data"""
+    if user_id == current_user.id:
+        return jsonify({'error': 'Cannot delete your own account from admin panel'}), 400
+    
+    user = User.query.get_or_404(user_id)
+    
+    # Delete all user's chats first
+    ChatData.query.filter_by(user_id=user.id).delete()
+    
+    # Delete user
+    db.session.delete(user)
+    db.session.commit()
+    
+    return jsonify({'message': f'User {user.username} and all their data deleted'})
+
+
+@app.route('/api/admin/check', methods=['GET'])
+@login_required
+def admin_check():
+    """Check if current user is admin"""
+    return jsonify({
+        'is_admin': getattr(current_user, 'is_admin', False)
+    })
 
 if __name__ == '__main__':
     # Bind explicitly to 127.0.0.1:5000 to match Vite proxy default

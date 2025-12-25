@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { 
+import {
   Activity,
   Brain,
-  CheckCircle, 
+  CheckCircle,
   ChevronDown,
   CloudUpload,
   MessageSquare,
@@ -206,7 +206,7 @@ export default function Landing() {
               size={64}
               animated
               showText
-              className="rounded-3xl bg-white/80 px-3 py-2 shadow-sm shadow-slate-900/10 ring-1 ring-white/70"
+              className="rounded-3xl bg-white/90 px-4 py-2.5 shadow-[0_8px_30px_rgba(91,127,255,0.25),0_4px_12px_rgba(124,58,237,0.15)] ring-1 ring-white/80 backdrop-blur-sm"
             />
           </Link>
           <div className="hidden items-center gap-4 text-sm font-medium text-slate-600 md:flex">
@@ -240,13 +240,13 @@ export default function Landing() {
           <div className="pointer-events-none absolute inset-0">
             <div className="absolute -top-20 -right-24 h-72 w-72 rounded-full bg-[#5B7FFF]/20 blur-3xl" />
             <div className="absolute bottom-0 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-[#7C3AED]/20 blur-3xl" />
-        </div>
+          </div>
 
           <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-12">
-          <motion.div
+            <motion.div
               initial={{ opacity: 0, y: 28 }}
               animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+              transition={{ duration: 0.6 }}
               className="space-y-8 lg:col-span-6 xl:col-span-5"
             >
               <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/60 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 shadow-sm">
@@ -285,11 +285,11 @@ export default function Landing() {
                   </div>
                 ))}
               </div>
-          </motion.div>
+            </motion.div>
 
             <motion.div
               initial={{ opacity: 0, y: 32 }}
-            animate={{ opacity: 1, y: 0 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1, duration: 0.6 }}
               className="relative lg:col-span-6 lg:col-start-7 xl:col-span-7"
             >
@@ -318,7 +318,7 @@ export default function Landing() {
 
                 <div className="space-y-4 py-6">
                   {HERO_MESSAGES.map((message, index) => (
-          <motion.div
+                    <motion.div
                       key={message.id}
                       initial={{ opacity: 0, x: message.isUser ? 20 : -20 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -326,34 +326,33 @@ export default function Landing() {
                       className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow ${
-                          message.isUser
+                        className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow ${message.isUser
                             ? 'bg-gradient-to-r from-[#5B7FFF] to-[#7C3AED] text-white shadow-[#5B7FFF]/40'
                             : 'bg-slate-50 text-slate-700 shadow-slate-200'
-                        }`}
+                          }`}
                       >
                         <span className="block font-medium">{message.content}</span>
                         <span className="mt-1 block text-xs opacity-70">{message.time}</span>
                       </div>
-          </motion.div>
+                    </motion.div>
                   ))}
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-400">
                   Suggestion • “The photos are in our shared folder — want me to resend?”
-            </div>
-            </div>
-          </motion.div>
-      </div>
-      </section>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </section>
 
         <section id="features" className={`${DESIGN_SYSTEM.spacing.section} bg-white`}>
           <div className="mx-auto max-w-7xl">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.4 }}
-            transition={{ duration: 0.6 }}
+              transition={{ duration: 0.6 }}
               className="mx-auto mb-14 max-w-2xl text-center"
             >
               <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF2FF] px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-[#5B7FFF]">
@@ -361,21 +360,21 @@ export default function Landing() {
               </div>
               <h2 className="mt-6 text-3xl font-bold text-slate-900 sm:text-4xl">
                 Built for conversations that matter, without clutter or guesswork.
-            </h2>
+              </h2>
               <p className="mt-4 text-lg text-slate-600">
                 Every surface follows the same rhythm: clear typography, smooth motion, and contrast-checked palettes that stay readable
                 on every screen.
-            </p>
-          </motion.div>
+              </p>
+            </motion.div>
 
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-            {features.map((feature, index) => {
-              const Icon = feature.icon
-              return (
-                <motion.div
-                  key={feature.title}
+              {features.map((feature, index) => {
+                const Icon = feature.icon
+                return (
+                  <motion.div
+                    key={feature.title}
                     initial={{ opacity: 0, y: 16 }}
-                  whileInView={{ opacity: 1, y: 0 }}
+                    whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, amount: 0.3 }}
                     transition={{ delay: index * 0.08, duration: 0.5 }}
                   >
@@ -384,24 +383,24 @@ export default function Landing() {
                     >
                       <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#5B7FFF] shadow-sm">
                         <Icon className="h-6 w-6" strokeWidth={2} />
-                    </div>
+                      </div>
                       <h3 className="mb-3 text-xl font-semibold text-slate-900">{feature.title}</h3>
                       <p className="text-base text-slate-600">{feature.description}</p>
-                  </UICard>
-                </motion.div>
-              )
-            })}
+                    </UICard>
+                  </motion.div>
+                )
+              })}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
         <section id="how-it-works" className={`${DESIGN_SYSTEM.spacing.section} bg-[#EEF3FF]`}>
           <div className="mx-auto max-w-7xl">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.4 }}
-            transition={{ duration: 0.6 }}
+              transition={{ duration: 0.6 }}
               className="mx-auto mb-12 max-w-xl text-center"
             >
               <div className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-[#7C3AED] shadow-sm shadow-slate-900/10">
@@ -410,77 +409,77 @@ export default function Landing() {
               <h2 className="mt-6 text-3xl font-bold text-slate-900 sm:text-4xl">From upload to lifelike chats in minutes.</h2>
               <p className="mt-4 text-lg text-slate-600">
                 Every stage is guided. Simply follow the prompts, preview the persona, and press start.
-            </p>
-              </motion.div>
+              </p>
+            </motion.div>
 
             <div className="grid gap-6 md:grid-cols-3">
-                {steps.map((step, index) => {
-                  const Icon = step.icon
-                  return (
-                    <motion.div
-                      key={step.title}
+              {steps.map((step, index) => {
+                const Icon = step.icon
+                return (
+                  <motion.div
+                    key={step.title}
                     initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
+                    whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, amount: 0.4 }}
                     transition={{ delay: index * 0.1, duration: 0.5 }}
-                      className="relative"
-                    >
-                      {index < steps.length - 1 && (
+                    className="relative"
+                  >
+                    {index < steps.length - 1 && (
                       <div className="absolute right-0 top-1/2 hidden h-px w-full translate-x-1/2 bg-gradient-to-r from-[#5B7FFF]/0 via-[#5B7FFF]/40 to-[#5B7FFF]/0 md:block" />
                     )}
                     <UICard className="relative z-10 h-full rounded-[28px] border border-white bg-white/80 p-8 shadow-md backdrop-blur-xl transition-transform duration-200 hover:-translate-y-1 hover:shadow-xl">
                       <div className="mb-8 flex items-center justify-between">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5B7FFF] to-[#7C3AED] text-white shadow-lg">
-                        {step.number}
-                      </div>
+                          {step.number}
+                        </div>
                         <div className="rounded-2xl bg-[#EEF3FF] p-3 text-[#5B7FFF]">
                           <Icon className="h-6 w-6" />
-                      </div>
                         </div>
+                      </div>
                       <h3 className="mb-3 text-xl font-semibold text-slate-900">{step.title}</h3>
                       <p className="mb-2 text-base text-slate-600">{step.description}</p>
                       <p className="text-sm font-medium text-slate-500">{step.detail}</p>
-                      </UICard>
-                    </motion.div>
-                  )
-                })}
-              </div>
-        </div>
-      </section>
+                    </UICard>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
 
         <section id="insights" className={`${DESIGN_SYSTEM.spacing.section} bg-white`}>
           <div className="mx-auto max-w-7xl">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.4 }}
-            transition={{ duration: 0.6 }}
+              transition={{ duration: 0.6 }}
               className="mx-auto mb-14 max-w-3xl text-center"
-          >
+            >
               <div className="inline-flex items-center gap-2 rounded-full bg-[#F0F9FF] px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-[#0EA5E9]">
                 Personality insights
-            </div>
+              </div>
               <h2 className="mt-6 text-3xl font-bold text-slate-900 sm:text-4xl">
                 Understand how every persona speaks before you send a single message.
-            </h2>
+              </h2>
               <p className="mt-4 text-lg text-slate-600">
                 Deep personality breakdowns reveal tone, pacing, sentiment, and memory cues. Fine-tune them to keep the conversation
                 feeling true-to-life.
-            </p>
-          </motion.div>
+              </p>
+            </motion.div>
 
-          <motion.div
+            <motion.div
               initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.4 }}
               transition={{ duration: 0.6 }}
               className="rounded-[34px] border border-slate-100 bg-gradient-to-br from-white via-[#F8FBFF] to-white p-10 shadow-xl shadow-slate-900/5"
-          >
+            >
               <div className="grid gap-10 lg:grid-cols-3">
                 {personalityTraits.map((trait, index) => {
                   const Icon = trait.icon
                   return (
-                        <motion.div
+                    <motion.div
                       key={trait.name}
                       initial={{ opacity: 0, y: 16 }}
                       whileInView={{ opacity: 1, y: 0 }}
@@ -496,8 +495,8 @@ export default function Landing() {
                           <div className="text-left">
                             <p className="text-sm font-medium text-slate-500">Persona trait</p>
                             <h3 className="text-lg font-semibold text-slate-900">{trait.name}</h3>
-                      </div>
-                    </div>
+                          </div>
+                        </div>
                         <span className="text-xl font-bold text-slate-900">{trait.value}%</span>
                       </div>
                       <p className="text-sm text-slate-500">
@@ -507,16 +506,16 @@ export default function Landing() {
                       <div className="mt-5 h-3 rounded-full bg-slate-100">
                         <motion.div
                           initial={{ width: 0 }}
-                            whileInView={{ width: `${trait.value}%` }}
+                          whileInView={{ width: `${trait.value}%` }}
                           viewport={{ once: true, amount: 0.4 }}
                           transition={{ duration: 0.7, delay: 0.2 }}
                           className={`h-full rounded-full bg-gradient-to-r ${trait.color}`}
                         />
-                    </div>
+                      </div>
                     </motion.div>
                   )
                 })}
-                    </div>
+              </div>
 
               <div className="mt-10 flex flex-col items-center justify-between gap-6 rounded-3xl border border-slate-200 bg-white/70 p-6 text-center shadow-inner shadow-slate-900/5 md:flex-row md:text-left">
                 <div>
@@ -532,77 +531,77 @@ export default function Landing() {
                   Explore the dashboard
                 </CTAButton>
               </div>
-          </motion.div>
-        </div>
-      </section>
+            </motion.div>
+          </div>
+        </section>
 
         <section className={`${DESIGN_SYSTEM.spacing.section} bg-[#F7F9FB]`}>
           <div className="mx-auto max-w-4xl">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.4 }}
-            transition={{ duration: 0.6 }}
+              transition={{ duration: 0.6 }}
               className="mb-12 text-center"
             >
               <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">Frequently asked questions</h2>
               <p className="mt-3 text-lg text-slate-600">
                 Clear answers so you feel confident before you upload anything.
-            </p>
-          </motion.div>
+              </p>
+            </motion.div>
 
-          <div className="space-y-4">
-            {faqs.map((faq, index) => (
-              <motion.div
+            <div className="space-y-4">
+              {faqs.map((faq, index) => (
+                <motion.div
                   key={faq.question}
                   initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                  whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, amount: 0.4 }}
                   transition={{ delay: index * 0.05, duration: 0.4 }}
-              >
+                >
                   <UICard className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm shadow-slate-900/5">
-                  <button
+                    <button
                       type="button"
-                    onClick={() => setOpenFaq(openFaq === index ? null : index)}
+                      onClick={() => setOpenFaq(openFaq === index ? null : index)}
                       className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-slate-50"
-                  >
-                      <span className="text-lg font-semibold text-slate-900">{faq.question}</span>
-                    <ChevronDown
-                        className={`h-6 w-6 text-slate-400 transition-transform duration-300 ${openFaq === index ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-                    <AnimatePresence initial={false}>
-                  {openFaq === index && (
-                      <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.3 }}
                     >
+                      <span className="text-lg font-semibold text-slate-900">{faq.question}</span>
+                      <ChevronDown
+                        className={`h-6 w-6 text-slate-400 transition-transform duration-300 ${openFaq === index ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+                    <AnimatePresence initial={false}>
+                      {openFaq === index && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.3 }}
+                        >
                           <div className="border-t border-slate-200/70 px-6 py-5 text-base leading-relaxed text-slate-600">
-                      {faq.answer}
-                        </div>
-                      </motion.div>
-                  )}
-                  </AnimatePresence>
-                </UICard>
-              </motion.div>
-            ))}
+                            {faq.answer}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </UICard>
+                </motion.div>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
         <section className={`${DESIGN_SYSTEM.spacing.section} bg-gradient-to-br from-[#0EA5E9] via-[#5B7FFF] to-[#7C3AED] text-white`}>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.4 }}
-          transition={{ duration: 0.6 }}
+            transition={{ duration: 0.6 }}
             className="mx-auto max-w-4xl text-center"
-        >
+          >
             <h2 className="text-3xl font-bold sm:text-4xl">
               Ready to meet the people you miss, exactly how you remember them?
-          </h2>
+            </h2>
             <p className="mt-4 text-lg text-white/85">
               Upload a single chat export and you’ll be chatting in less time than it takes to brew coffee.
             </p>
@@ -630,19 +629,19 @@ export default function Landing() {
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5" />
                 <span>End-to-end encrypted</span>
-          </div>
-            <div className="flex items-center gap-2">
+              </div>
+              <div className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5" />
                 <span>One-click data deletion</span>
-            </div>
-            <div className="flex items-center gap-2">
+              </div>
+              <div className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5" />
                 <span>Live onboarding support</span>
+              </div>
             </div>
-          </div>
-        </motion.div>
-      </section>
+          </motion.div>
+        </section>
       </main>
-      </div>
+    </div>
   )
 }

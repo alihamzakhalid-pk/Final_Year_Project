@@ -32,11 +32,17 @@ export function AuthProvider({ children }) {
   }, [])
 
   const login = async ({ email, password, identifier }) => {
-    const { data } = await api.post('/api/login', { 
-      email: email || identifier, 
+    const { data } = await api.post('/api/login', {
+      email: email || identifier,
       identifier: identifier || email,
-      password 
+      password
     })
+    // Handle direct login response
+    if (data?.user) {
+      const token = data?.token || 'session'
+      localStorage.setItem('auth_token', token)
+      setUser(data.user)
+    }
     return data
   }
 

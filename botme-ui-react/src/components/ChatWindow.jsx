@@ -43,7 +43,7 @@ export default function ChatWindow({ messages = [], typing = false, personaName 
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[#F8FAFC]">
+    <div className="flex h-full flex-col overflow-hidden bg-[#F8FAFC] dark:bg-slate-900 transition-colors duration-300">
       <div
         ref={scrollRef}
         className="flex-1 space-y-4 overflow-y-auto px-6 py-6 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent"
@@ -53,9 +53,9 @@ export default function ChatWindow({ messages = [], typing = false, personaName 
         {messages.length === 0 && !typing && (
           <div className="flex h-full items-center justify-center">
             <div className="text-center space-y-3">
-              <MessageSquare className="h-12 w-12 text-[#9CA3AF] mx-auto" />
-              <p className="text-base font-medium text-[#1F2937]">No messages yet. Start the conversation!</p>
-              <p className="text-sm text-[#6B7280]">Type a message below to begin chatting with {personaName || 'AI'}</p>
+              <MessageSquare className="h-12 w-12 text-[#9CA3AF] dark:text-slate-500 mx-auto" />
+              <p className="text-base font-medium text-[#1F2937] dark:text-slate-100">No messages yet. Start the conversation!</p>
+              <p className="text-sm text-[#6B7280] dark:text-slate-400">Type a message below to begin chatting with {personaName || 'AI'}</p>
             </div>
           </div>
         )}
@@ -76,19 +76,18 @@ export default function ChatWindow({ messages = [], typing = false, personaName 
                 className={`group flex w-full gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
               >
                 {showAvatar && !isUser && (
-                  <Avatar name={personaName || 'AI'} size={32} className="mt-1 flex-shrink-0" />
+                  <Avatar name={personaName || 'AI'} size={36} className="mt-1 flex-shrink-0 ring-2 ring-white shadow-md" />
                 )}
-                {isUser && <div className="w-8" />}
-                <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[70%]`}>
+                {isUser && <div className="w-9" />}
+                <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[75%]`}>
                   <div
-                    className={`relative ${
-                      isUser
-                        ? 'rounded-2xl rounded-tr-[4px] bg-[#5B7FFF] text-white shadow-sm'
-                        : 'rounded-2xl rounded-tl-[4px] border border-[#E5E7EB] bg-white text-[#1F2937] shadow-sm'
-                    } px-4 py-3 group-hover:shadow-md transition-all duration-200`}
+                    className={`relative ${isUser
+                      ? 'rounded-2xl rounded-tr-sm bg-gradient-to-br from-[#5B7FFF] to-[#7C3AED] text-white shadow-lg shadow-blue-500/20'
+                      : 'rounded-2xl rounded-tl-sm border border-[#E5E7EB] bg-white text-[#1F2937] shadow-md'
+                      } px-4 py-3 group-hover:shadow-lg transition-all duration-200`}
                   >
                     <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
-                    
+
                     {/* Message Actions */}
                     <div className={`absolute ${isUser ? '-left-12' : '-right-12'} top-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
                       <Tooltip content={isCopied ? 'Copied!' : 'Copy message'}>
@@ -106,7 +105,7 @@ export default function ChatWindow({ messages = [], typing = false, personaName 
                       </Tooltip>
                     </div>
                   </div>
-                  <span className={`mt-1.5 text-xs text-[#6B7280] ${isUser ? 'text-right' : 'text-left'}`}>
+                  <span className={`mt-1.5 text-xs text-[#9CA3AF] ${isUser ? 'text-right' : 'text-left'}`}>
                     {formatTime(message.timestamp || Date.now())}
                   </span>
                 </div>

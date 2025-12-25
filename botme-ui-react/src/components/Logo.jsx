@@ -1,5 +1,13 @@
 import { motion } from 'framer-motion'
 
+/**
+ * BotMe Logo - AI Persona Chatbot
+ * 
+ * Design represents:
+ * - Chat bubble with persona silhouette inside
+ * - Memory/brain concept through connecting nodes
+ * - Modern gradient styling
+ */
 export default function Logo({
   size = 48,
   animated = false,
@@ -9,31 +17,31 @@ export default function Logo({
 }) {
   const colors = dark
     ? {
-        gradientStart: '#8EA6FF',
-        gradientMid: '#A386FF',
-        gradientEnd: '#C07BFF',
-        text: '#F8FAFF',
-        iconHighlight: '#FFFFFF',
-      }
+      gradientStart: '#8EA6FF',
+      gradientMid: '#A386FF',
+      gradientEnd: '#C07BFF',
+      text: '#F8FAFF',
+      iconHighlight: '#FFFFFF',
+    }
     : {
-        gradientStart: '#5B7FFF',
-        gradientMid: '#6D5DFF',
-        gradientEnd: '#7C3AED',
-        text: '#0F172A',
-        iconHighlight: '#FFFFFF',
-      }
+      gradientStart: '#5B7FFF',
+      gradientMid: '#7C3AED',
+      gradientEnd: '#9333EA',
+      text: '#0F172A',
+      iconHighlight: '#FFFFFF',
+    }
 
   const floatVariants = animated
     ? {
-        float: {
-          y: [0, -6, 0],
-          transition: {
-            duration: 3,
-            ease: 'easeInOut',
-            repeat: Infinity,
-          },
+      float: {
+        y: [0, -4, 0],
+        transition: {
+          duration: 2.5,
+          ease: 'easeInOut',
+          repeat: Infinity,
         },
-      }
+      },
+    }
     : {}
 
   const Icon = () => (
@@ -48,21 +56,25 @@ export default function Logo({
       <defs>
         <linearGradient
           id={`botme-logo-gradient-${dark ? 'dark' : 'light'}`}
-          x1="10"
-          y1="10"
-          x2="54"
-          y2="52"
+          x1="8"
+          y1="8"
+          x2="56"
+          y2="56"
           gradientUnits="userSpaceOnUse"
         >
           <stop offset="0%" stopColor={colors.gradientStart} />
           <stop offset="50%" stopColor={colors.gradientMid} />
           <stop offset="100%" stopColor={colors.gradientEnd} />
         </linearGradient>
-        <filter id={`botme-logo-shadow-${dark ? 'dark' : 'light'}`} x="-10%" y="-10%" width="120%" height="120%">
-          <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor={dark ? '#000000' : '#1F2A44'} floodOpacity="0.18" />
+        <filter id={`botme-logo-shadow-${dark ? 'dark' : 'light'}`} x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor={colors.gradientMid} floodOpacity="0.35" />
         </filter>
+        <clipPath id="icon-clip">
+          <rect x="10" y="10" width="44" height="44" rx="14" />
+        </clipPath>
       </defs>
 
+      {/* Main rounded square with gradient */}
       <rect
         x="10"
         y="10"
@@ -73,37 +85,61 @@ export default function Logo({
         filter={`url(#botme-logo-shadow-${dark ? 'dark' : 'light'})`}
       />
 
+      {/* Inner glow effect */}
       <rect
-        x="14"
-        y="14"
-        width="36"
-        height="36"
+        x="12"
+        y="12"
+        width="40"
+        height="40"
         rx="12"
-        fill={colors.iconHighlight}
-        opacity="0.1"
+        fill="white"
+        opacity="0.08"
       />
 
+      {/* Persona silhouette - represents the AI mimicking a person */}
       <g fill={colors.iconHighlight}>
-        <rect x="22" y="24" width="20" height="3" rx="1.5" />
-        <rect x="22" y="30" width="16" height="3" rx="1.5" />
-        <rect x="22" y="36" width="12" height="3" rx="1.5" />
-        <circle cx="44" cy="30.5" r="2.5" opacity="0.85" />
+        {/* Head circle */}
+        <circle cx="32" cy="22" r="6" opacity="0.95" />
+        {/* Body arc */}
+        <path
+          d="M22 38 C22 30, 26 27, 32 27 C38 27, 42 30, 42 38"
+          fill="none"
+          stroke={colors.iconHighlight}
+          strokeWidth="3"
+          strokeLinecap="round"
+          opacity="0.9"
+        />
+      </g>
+
+      {/* Chat bubble indicator - bottom right */}
+      <g transform="translate(40, 40)">
+        <circle cx="6" cy="6" r="8" fill={colors.iconHighlight} opacity="0.95" />
+        <circle cx="3" cy="6" r="1.5" fill={colors.gradientMid} />
+        <circle cx="6" cy="6" r="1.5" fill={colors.gradientMid} />
+        <circle cx="9" cy="6" r="1.5" fill={colors.gradientMid} />
+      </g>
+
+      {/* Memory nodes - connecting dots representing AI learning */}
+      <g fill={colors.iconHighlight} opacity="0.6">
+        <circle cx="16" cy="16" r="2" />
+        <circle cx="48" cy="16" r="2" />
+        <circle cx="16" cy="48" r="1.5" />
       </g>
     </svg>
   )
 
   return (
-    <motion.div className="flex items-center gap-3" variants={floatVariants} animate={animated ? 'float' : undefined}>
+    <motion.div className="flex items-center gap-2.5" variants={floatVariants} animate={animated ? 'float' : undefined}>
       {!textOnly && <Icon />}
 
       {showText && (
         <div className="flex flex-col">
           <span
-            className="font-black leading-none"
+            className="font-black leading-none tracking-tight"
             style={{
-              fontSize: size * 0.52,
-              letterSpacing: '-0.03em',
-              background: `linear-gradient(120deg, ${colors.gradientStart}, ${colors.gradientMid}, ${colors.gradientEnd})`,
+              fontSize: size * 0.5,
+              letterSpacing: '-0.02em',
+              background: `linear-gradient(135deg, ${colors.gradientStart}, ${colors.gradientMid}, ${colors.gradientEnd})`,
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
@@ -113,16 +149,18 @@ export default function Logo({
           >
             BotMe
           </span>
-          {size >= 56 && (
+          {size >= 48 && (
             <span
-              className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.35em]"
+              className="font-medium uppercase"
               style={{
-                color: colors.text,
-                opacity: dark ? 0.7 : 0.55,
+                fontSize: size * 0.16,
+                letterSpacing: '0.15em',
+                color: dark ? 'rgba(255,255,255,0.6)' : 'rgba(15,23,42,0.5)',
                 fontFamily: 'Inter, system-ui, sans-serif',
+                marginTop: '2px',
               }}
             >
-              AI COMPANION
+              AI Persona
             </span>
           )}
         </div>
@@ -130,3 +168,4 @@ export default function Logo({
     </motion.div>
   )
 }
+

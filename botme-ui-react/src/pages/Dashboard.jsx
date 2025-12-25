@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { CloudUpload, Trash2, Search, MessageSquare } from 'lucide-react'
+import { CloudUpload, Trash2, Search, MessageSquare, Brain, Sparkles } from 'lucide-react'
 import UICard from '../components/ui/Card'
 import Avatar from '../components/Avatar'
 import UIButton from '../components/ui/Button'
@@ -42,13 +42,13 @@ export default function Dashboard() {
 
   const handleFileSelected = async (selectedFile) => {
     if (!selectedFile) return
-    
+
     // Validate file
     if (!selectedFile.name.endsWith('.txt')) {
       setError('Invalid file format. Please upload a .txt file.')
       return
     }
-    
+
     if (selectedFile.size > 5 * 1024 * 1024) {
       setError('File size exceeds 5MB limit.')
       return
@@ -67,22 +67,22 @@ export default function Dashboard() {
       setStatus('Uploading transcript…')
       const formData = new FormData()
       formData.append('file', file)
-      
+
       const { data: uploadData } = await api.post('/api/upload', formData)
       const chatId = uploadData?.chat_id
       const participants = uploadData?.participants || []
-      
+
       if (!chatId || participants.length === 0) {
         throw new Error('No participants found in the chat.')
       }
 
       setStatus('Analysis complete! Redirecting…')
       showSuccess(`Chat analyzed! ${participants.length} personas found`)
-      
+
       setTimeout(() => {
-      navigate(`/select/${chatId}`, {
+        navigate(`/select/${chatId}`, {
           state: { participants },
-      })
+        })
       }, 500)
     } catch (uploadError) {
       const errorMsg = uploadError?.response?.data?.error || uploadError?.message || 'Unable to analyse the file. Please try again.'
@@ -127,7 +127,7 @@ export default function Dashboard() {
     return date.toLocaleDateString()
   }
 
-  const filteredPersonas = personas.filter(p => 
+  const filteredPersonas = personas.filter(p =>
     p.name?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
@@ -136,16 +136,16 @@ export default function Dashboard() {
   const getAvatarColor = (index) => avatarColors[index % avatarColors.length]
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-900 transition-colors duration-300">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
         {/* Upload Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
           className="mb-8"
         >
-          <UICard className="rounded-xl bg-white p-8 shadow-sm border border-[#E5E7EB]">
+          <UICard className="rounded-xl bg-white dark:bg-slate-800 p-8 shadow-sm border border-[#E5E7EB] dark:border-slate-700">
             <label
               htmlFor="chat-upload"
               onDrop={(e) => {
@@ -159,18 +159,17 @@ export default function Dashboard() {
                 setIsDragging(true)
               }}
               onDragLeave={() => setIsDragging(false)}
-              className={`flex cursor-pointer flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed transition-all ${
-                isDragging
-                  ? 'border-[#5B7FFF] bg-[#EFF6FF]'
-                  : 'border-[#E5E7EB] bg-white hover:border-[#5B7FFF] hover:bg-[#EFF6FF]'
-              } px-8 py-16`}
+              className={`flex cursor-pointer flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed transition-all ${isDragging
+                ? 'border-[#5B7FFF] bg-[#EFF6FF]'
+                : 'border-[#E5E7EB] bg-white hover:border-[#5B7FFF] hover:bg-[#EFF6FF]'
+                } px-8 py-16`}
             >
               <CloudUpload className={`h-16 w-16 ${isDragging ? 'text-[#5B7FFF]' : 'text-[#6B7280]'}`} />
               <div className="text-center space-y-2">
-                <p className="text-base font-medium text-[#1F2937]">
+                <p className="text-base font-medium text-[#1F2937] dark:text-slate-100">
                   Drag and drop your chat file
                 </p>
-                <p className="text-sm text-[#6B7280]">
+                <p className="text-sm text-[#6B7280] dark:text-slate-400">
                   Accepted format: WhatsApp or Messenger export (.txt). Max size: 5MB
                 </p>
               </div>
@@ -192,21 +191,21 @@ export default function Dashboard() {
               >
                 {busy ? 'Processing…' : 'Analyse transcript'}
               </UIButton>
-              </div>
+            </div>
 
             {/* Status/Error Messages */}
             {status && (
               <div className="mt-4 rounded-lg bg-[#EFF6FF] px-4 py-3 text-sm text-[#1F2937] text-center">
                 {status}
-            </div>
+              </div>
             )}
             {error && (
               <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 text-center">
                 {error}
-          </div>
+              </div>
             )}
-        </UICard>
-      </motion.div>
+          </UICard>
+        </motion.div>
 
         {/* Personas Section */}
         <motion.div
@@ -215,7 +214,7 @@ export default function Dashboard() {
           transition={{ delay: 0.1, duration: 0.4 }}
         >
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[#1F2937]">
+            <h2 className="text-lg font-semibold text-[#1F2937] dark:text-slate-100">
               Your Personas {personas.length > 0 && `(${personas.length})`}
             </h2>
             {personas.length > 0 && (
@@ -236,12 +235,12 @@ export default function Dashboard() {
           ) : filteredPersonas.length > 0 ? (
             <div className="space-y-4">
               {filteredPersonas.map((persona, index) => (
-          <motion.div
+                <motion.div
                   key={persona.chat_id}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className="group relative flex items-center gap-4 rounded-xl bg-white border border-[#E5E7EB] p-4 transition-all duration-200 hover:shadow-md hover:border-[#5B7FFF] cursor-pointer"
+                  className="group relative flex items-center gap-4 rounded-xl bg-white dark:bg-slate-800 border border-[#E5E7EB] dark:border-slate-700 p-4 transition-all duration-200 hover:shadow-md hover:border-[#5B7FFF] cursor-pointer"
                   onClick={() => handleChatWithPersona(persona.chat_id)}
                 >
                   {/* Avatar */}
@@ -250,7 +249,7 @@ export default function Dashboard() {
                     style={{ backgroundColor: getAvatarColor(index) }}
                   >
                     {persona.name?.charAt(0)?.toUpperCase() || '?'}
-              </div>
+                  </div>
 
                   {/* Middle Section */}
                   <div className="flex-1 min-w-0">
@@ -267,22 +266,33 @@ export default function Dashboard() {
                           <span>{formatTimeAgo(persona.last_chat_date)}</span>
                         </>
                       )}
-              </div>
+                    </div>
                     <p className="mt-1 text-sm text-[#6B7280] truncate">
                       💬 {persona.last_message || 'No messages yet...'}
                     </p>
-                </div>
+                  </div>
 
                   {/* Right Actions */}
                   <div className="flex items-center gap-2">
                     <UIButton
                       onClick={(e) => {
                         e.stopPropagation()
+                        navigate(`/personality/${persona.chat_id}`, { state: { personName: persona.name, chatId: persona.chat_id } })
+                      }}
+                      className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-2 text-sm font-semibold text-white hover:from-purple-700 hover:to-blue-700 transition-all duration-200 shadow-sm hover:shadow-md"
+                    >
+                      <Brain className="h-4 w-4" />
+                      Analyze
+                    </UIButton>
+                    <UIButton
+                      onClick={(e) => {
+                        e.stopPropagation()
                         handleChatWithPersona(persona.chat_id)
                       }}
-                      className="rounded-lg bg-[#5B7FFF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4A6AD9] transition-all duration-200"
+                      className="flex items-center gap-2 rounded-lg bg-[#5B7FFF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4A6AD9] transition-all duration-200 shadow-sm hover:shadow-md"
                     >
-                      Chat Now
+                      <MessageSquare className="h-4 w-4" />
+                      Chat
                     </UIButton>
                     <button
                       onClick={(e) => handleDeletePersona(persona.chat_id, e)}
@@ -291,11 +301,11 @@ export default function Dashboard() {
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              ) : (
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
             <UICard className="rounded-xl bg-white border border-[#E5E7EB] p-12 text-center">
               <MessageSquare className="h-12 w-12 text-[#9CA3AF] mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-[#1F2937] mb-2">No personas yet</h3>
@@ -310,7 +320,7 @@ export default function Dashboard() {
               </UIButton>
             </UICard>
           )}
-          </motion.div>
+        </motion.div>
       </div>
     </div>
   )

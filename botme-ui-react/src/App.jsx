@@ -19,6 +19,7 @@ import useThemePreference from './hooks/useThemePreference'
 import SelectPerson from './pages/SelectPerson'
 import Settings from './pages/Settings'
 import PersonalityAnalysis from './pages/PersonalityAnalysis'
+import Admin from './pages/Admin'
 import { ToastProvider } from './components/ui/Toast'
 
 export default function App() {
@@ -39,58 +40,66 @@ export default function App() {
               className="flex-1"
             >
               <Routes location={location}>
-                    <Route path="/" element={<Landing />} />
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/signup" element={<Signup />} />
-                    <Route path="/forgot-password" element={<ForgotPassword />} />
-                    <Route path="/about" element={<About />} />
-                    <Route path="/help" element={<Help />} />
-                    <Route path="/contact" element={<Contact />} />
-                    <Route path="/privacy" element={<Privacy />} />
-                    <Route path="/terms" element={<Terms />} />
-                    <Route
-                      path="/dashboard"
-                      element={(
-                        <ProtectedRoute>
-                          <Dashboard />
-                        </ProtectedRoute>
-                      )}
-                    />
-                    <Route
-                      path="/select/:chatId"
-                      element={(
-                        <ProtectedRoute>
-                          <SelectPerson />
-                        </ProtectedRoute>
-                      )}
-                    />
-                    <Route
-                      path="/chat/:chatId"
-                      element={(
-                        <ProtectedRoute>
-                          <Chat />
-                        </ProtectedRoute>
-                      )}
-                    />
-                    <Route
-                      path="/settings"
-                      element={(
-                        <ProtectedRoute>
-                          <Settings />
-                        </ProtectedRoute>
-                      )}
-                    />
-                    <Route
-                      path="/personality/:chatId?"
-                      element={(
-                        <ProtectedRoute>
-                          <PersonalityAnalysis />
-                        </ProtectedRoute>
-                      )}
-                    />
-                    <Route path="/chat" element={<Navigate to="/dashboard" replace />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
+                <Route path="/" element={<Landing />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/help" element={<Help />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route
+                  path="/dashboard"
+                  element={(
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  )}
+                />
+                <Route
+                  path="/select/:chatId"
+                  element={(
+                    <ProtectedRoute>
+                      <SelectPerson />
+                    </ProtectedRoute>
+                  )}
+                />
+                <Route
+                  path="/chat/:chatId"
+                  element={(
+                    <ProtectedRoute>
+                      <Chat />
+                    </ProtectedRoute>
+                  )}
+                />
+                <Route
+                  path="/settings"
+                  element={(
+                    <ProtectedRoute>
+                      <Settings />
+                    </ProtectedRoute>
+                  )}
+                />
+                <Route
+                  path="/personality/:chatId?"
+                  element={(
+                    <ProtectedRoute>
+                      <PersonalityAnalysis />
+                    </ProtectedRoute>
+                  )}
+                />
+                <Route
+                  path="/admin"
+                  element={(
+                    <ProtectedRoute>
+                      <Admin />
+                    </ProtectedRoute>
+                  )}
+                />
+                <Route path="/chat" element={<Navigate to="/dashboard" replace />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
             </motion.main>
           </AnimatePresence>
           {!location.pathname.startsWith('/chat') && <Footer />}

@@ -43,7 +43,7 @@ def get_llm():
         raise RuntimeError("OPENAI_API_KEY is not set")
     
     return ChatOpenAI(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         temperature=0.7,
         openai_api_key=api_key
     )

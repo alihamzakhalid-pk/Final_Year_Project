@@ -1,49 +1,51 @@
 import { motion } from 'framer-motion'
 
 /**
- * BotMe Logo Component - Ultra Modern Design
+ * BotMe Logo - AI Persona Chatbot
  * 
- * Sleek, contemporary logo representing AI conversations and memories:
- * - Modern geometric icon with conversation flow
- * - Elegant gradient typography
- * - Professional and memorable
+ * Design represents:
+ * - Chat bubble with persona silhouette inside
+ * - Memory/brain concept through connecting nodes
+ * - Modern gradient styling
  * 
- * @param {number} size - Icon size in pixels (default: 48)
- * @param {boolean} showText - Show wordmark text (default: true)
- * @param {boolean} dark - Use dark mode colors (default: false)
- * @param {boolean} animated - Enable floating animation (default: false)
- * @param {string} className - Additional CSS classes
+ * This component matches Logo.jsx for consistency
  */
-export default function BotMeLogo({ 
-  size = 48, 
-  showText = true, 
+export default function BotMeLogo({
+  size = 48,
+  showText = true,
   dark = false,
   animated = false,
   className = ''
 }) {
-  // Modern color palette matching overall design
-  const colors = {
-    primary: '#5B7FFF',        // Blue
-    secondary: '#7C3AED',      // Purple
-    accent: '#0EA5E9',         // Cyan
-    gradientStart: '#5B7FFF',
-    gradientMid: '#6D5DFF',
-    gradientEnd: '#7C3AED',
-    text: dark ? '#F3F4F6' : '#1F2937',
-  }
+  const colors = dark
+    ? {
+      gradientStart: '#8EA6FF',
+      gradientMid: '#A386FF',
+      gradientEnd: '#C07BFF',
+      text: '#F8FAFF',
+      iconHighlight: '#FFFFFF',
+    }
+    : {
+      gradientStart: '#5B7FFF',
+      gradientMid: '#7C3AED',
+      gradientEnd: '#9333EA',
+      text: '#0F172A',
+      iconHighlight: '#FFFFFF',
+    }
 
-  const logoVariants = animated ? {
-    float: {
-      y: [0, -6, 0],
-      transition: {
-        duration: 3.5,
-        ease: 'easeInOut',
-        repeat: Infinity,
+  const floatVariants = animated
+    ? {
+      float: {
+        y: [0, -4, 0],
+        transition: {
+          duration: 2.5,
+          ease: 'easeInOut',
+          repeat: Infinity,
+        },
       },
-    },
-  } : {}
+    }
+    : {}
 
-  // Modern chat bubble icon with gradient
   const LogoIcon = () => (
     <svg
       width={size}
@@ -54,69 +56,93 @@ export default function BotMeLogo({
       className="flex-shrink-0"
     >
       <defs>
-        <linearGradient id={`botme-grad-main-${dark ? 'dark' : 'light'}`} x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+        <linearGradient
+          id={`botme-grad-main-${dark ? 'dark' : 'light'}`}
+          x1="8"
+          y1="8"
+          x2="56"
+          y2="56"
+          gradientUnits="userSpaceOnUse"
+        >
           <stop offset="0%" stopColor={colors.gradientStart} />
           <stop offset="50%" stopColor={colors.gradientMid} />
           <stop offset="100%" stopColor={colors.gradientEnd} />
         </linearGradient>
-        <filter id={`botme-shadow-${dark ? 'dark' : 'light'}`}>
-          <feDropShadow dx="0" dy="2" stdDeviation="4" floodOpacity="0.15" />
+        <filter id={`botme-shadow-${dark ? 'dark' : 'light'}`} x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor={colors.gradientMid} floodOpacity="0.5" />
+          <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor={colors.gradientStart} floodOpacity="0.3" />
         </filter>
       </defs>
 
-      {/* Modern rounded square chat bubble */}
+      {/* Main rounded square with gradient */}
+      <rect
+        x="10"
+        y="10"
+        width="44"
+        height="44"
+        rx="14"
+        fill={`url(#botme-grad-main-${dark ? 'dark' : 'light'})`}
+        filter={`url(#botme-shadow-${dark ? 'dark' : 'light'})`}
+      />
+
+      {/* Inner glow effect */}
       <rect
         x="12"
         y="12"
         width="40"
         height="40"
         rx="12"
-        fill={`url(#botme-grad-main-${dark ? 'dark' : 'light'})`}
-        filter={`url(#botme-shadow-${dark ? 'dark' : 'light'})`}
-      />
-      
-      {/* Inner highlight for depth */}
-      <rect
-        x="14"
-        y="14"
-        width="36"
-        height="36"
-        rx="10"
         fill="white"
-        opacity="0.15"
+        opacity="0.08"
       />
-      
-      {/* Modern message lines - clean and minimal */}
-      <g fill="white" opacity={dark ? 0.95 : 1}>
-        {/* Top line - full width */}
-        <rect x="20" y="22" width="24" height="3" rx="1.5" />
-        {/* Middle line - medium width */}
-        <rect x="20" y="28" width="20" height="3" rx="1.5" />
-        {/* Bottom line - short width */}
-        <rect x="20" y="34" width="16" height="3" rx="1.5" />
-        {/* Chat indicator dot */}
-        <circle cx="48" cy="30" r="2.5" fill="white" opacity="0.8" />
+
+      {/* Persona silhouette - represents the AI mimicking a person */}
+      <g fill={colors.iconHighlight}>
+        {/* Head circle */}
+        <circle cx="32" cy="22" r="6" opacity="0.95" />
+        {/* Body arc */}
+        <path
+          d="M22 38 C22 30, 26 27, 32 27 C38 27, 42 30, 42 38"
+          fill="none"
+          stroke={colors.iconHighlight}
+          strokeWidth="3"
+          strokeLinecap="round"
+          opacity="0.9"
+        />
+      </g>
+
+      {/* Chat bubble indicator - bottom right */}
+      <g transform="translate(40, 40)">
+        <circle cx="6" cy="6" r="8" fill={colors.iconHighlight} opacity="0.95" />
+        <circle cx="3" cy="6" r="1.5" fill={colors.gradientMid} />
+        <circle cx="6" cy="6" r="1.5" fill={colors.gradientMid} />
+        <circle cx="9" cy="6" r="1.5" fill={colors.gradientMid} />
+      </g>
+
+      {/* Memory nodes - connecting dots representing AI learning */}
+      <g fill={colors.iconHighlight} opacity="0.6">
+        <circle cx="16" cy="16" r="2" />
+        <circle cx="48" cy="16" r="2" />
+        <circle cx="16" cy="48" r="1.5" />
       </g>
     </svg>
   )
 
   return (
     <motion.div
-      className={`flex items-center gap-3 ${className}`}
-      variants={logoVariants}
+      className={`flex items-center gap-2.5 ${className}`}
+      variants={floatVariants}
       animate={animated ? 'float' : {}}
     >
-      {/* SVG Icon */}
       <LogoIcon />
-      
-      {/* Modern Wordmark with gradient */}
+
       {showText && (
         <div className="flex flex-col">
           <span
-            className="font-black leading-none"
+            className="font-black leading-none tracking-tight"
             style={{
               fontSize: `${size * 0.55}px`,
-              letterSpacing: '-0.03em',
+              letterSpacing: '-0.02em',
               background: `linear-gradient(135deg, ${colors.gradientStart}, ${colors.gradientMid}, ${colors.gradientEnd})`,
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
@@ -127,16 +153,18 @@ export default function BotMeLogo({
           >
             BotMe
           </span>
-          {size >= 64 && (
+          {size >= 48 && (
             <span
-              className="text-[10px] font-semibold tracking-widest mt-0.5 opacity-70"
+              className="font-medium uppercase"
               style={{
-                color: colors.text,
-                letterSpacing: '0.2em',
+                fontSize: `${size * 0.16}px`,
+                letterSpacing: '0.15em',
+                color: dark ? 'rgba(255,255,255,0.6)' : 'rgba(15,23,42,0.5)',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
+                marginTop: '2px',
               }}
             >
-              AI COMPANION
+              AI Persona
             </span>
           )}
         </div>
@@ -144,3 +172,4 @@ export default function BotMeLogo({
     </motion.div>
   )
 }
+

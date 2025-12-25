@@ -257,7 +257,7 @@ export default function Chat() {
     setError('')
 
     try {
-      const { data } = await api.post(`/api/chat/${chatId}`, { message: trimmed })
+      const { data } = await api.post(`/api/chat/${chatId}/rag`, { message: trimmed })
       const assistantReply = {
         id: crypto.randomUUID(),
         role: 'assistant',

@@ -9,10 +9,14 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), unique=True, nullable=False)
     email = db.Column(db.String(150), unique=True, nullable=False)
+    full_name = db.Column(db.String(200), nullable=True)  # User's full name
     password_hash = db.Column(db.String(128), nullable=True)  # Nullable for OAuth users
     oauth_provider = db.Column(db.String(50), nullable=True)  # 'google', 'facebook', 'microsoft', 'apple', 'github'
     oauth_id = db.Column(db.String(255), nullable=True)  # Provider's user ID
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)  # Admin flag
+    is_active = db.Column(db.Boolean, default=True, nullable=False)  # Account status
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login = db.Column(db.DateTime, nullable=True)  # Last login timestamp
     chat_data = db.relationship('ChatData', backref='user', lazy=True)
 
     def set_password(self, password):
