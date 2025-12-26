@@ -37,12 +37,14 @@ CORS(
             r"http://127.0.0.1:5173",
             r"http://192\.168\.[0-9]{1,3}\.[0-9]{1,3}:5173",
             frontend_url,  # Production frontend URL
+            r"https://.*\.onrender\.com",  # Allow all Render subdomains
         ]
     }, r"/auth/*": {
         "origins": [
             r"http://localhost:5173",
             r"http://127.0.0.1:5173",
             frontend_url,
+            r"https://.*\.onrender\.com",  # Allow all Render subdomains
         ]
     }},
     supports_credentials=True,
