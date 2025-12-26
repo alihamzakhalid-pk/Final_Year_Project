@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Flask, request, redirect, url_for, flash, jsonify, session
 import re
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -178,202 +178,47 @@ ALLOWED_EXTENSIONS = {'txt'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# ============================================================
+# LEGACY HTML ROUTES - Removed (Using React Frontend Now)
+# These routes now return JSON for API-only backend
+# ============================================================
+
 @app.route('/')
 def index():
-    if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+    """Root endpoint - returns API info for backend-only deployment"""
+    return jsonify({
+        'name': 'BotMe API',
+        'version': '1.0.0',
+        'status': 'running',
+        'message': 'This is the API backend. Please access the frontend at your frontend URL.',
+        'endpoints': {
+            'health': '/api/health',
+            'auth': '/api/login, /api/signup, /api/logout',
+            'chat': '/api/chat/<chat_id>/rag'
+        }
+    })
 
-@app.route('/signup', methods=['GET', 'POST'])
-def signup():
-    if request.method == 'POST':
-        username = request.form['username']
-        email = request.form['email']
-        password = request.form['password']
-        
-        if User.query.filter_by(username=username).first() or User.query.filter_by(email=email).first():
-            flash('Username or email already exists.')
-            return redirect(url_for('signup'))
-        
-        user = User(username=username, email=email)
-        user.set_password(password)
-        db.session.add(user)
-        db.session.commit()
-        flash('Signup successful! Please log in.')
-        return redirect(url_for('login'))
-    
-    return render_template('signup.html')
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        
-        user = User.query.filter_by(username=username).first()
-        if user and user.check_password(password):
-            login_user(user)
-            return redirect(url_for('dashboard'))
-        flash('Invalid username or password.')
-    
-    return render_template('login.html')
+# Legacy routes - redirect to frontend or return JSON
+@app.route('/signup')
+@app.route('/login')
+@app.route('/dashboard')
+@app.route('/select_person')
+@app.route('/chat/<int:chat_id>')
+def legacy_routes(**kwargs):
+    """Legacy HTML routes - now handled by React frontend"""
+    frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+    return jsonify({
+        'error': 'This route is handled by the frontend',
+        'redirect': frontend_url,
+        'message': 'Please access the frontend application directly'
+    }), 302
 
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('login'))
+    return jsonify({'message': 'Logged out successfully'})
 
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    return render_template('dashboard.html')
-
-@app.route('/upload', methods=['POST'])
-@login_required
-def upload_file():
-    if 'file' not in request.files:
-        flash('No file selected.')
-        return redirect(url_for('dashboard'))
-    
-    file = request.files['file']
-    if file.filename == '':
-        flash('No file selected.')
-        return redirect(url_for('dashboard'))
-    
-    if not file or not allowed_file(file.filename):
-        flash('Invalid file type. Only .txt files are allowed.')
-        return redirect(url_for('dashboard'))
-    
-    try:
-        # Read and decode file content
-        content = file.read().decode('utf-8', errors='ignore')
-        
-        # Check if file is empty
-        if not content or len(content.strip()) < 50:
-            flash('The file appears to be empty or too short. Please upload a valid WhatsApp chat export.')
-            return redirect(url_for('dashboard'))
-        
-        # Parse the chat file
-        parsed = parse_chat_file(content)
-        
-        # Validate participants
-        if not parsed.get('participants') or len(parsed['participants']) < 2:
-            flash('Could not find at least 2 participants in the chat. Please ensure the file is a valid WhatsApp export with messages from multiple people.')
-            return redirect(url_for('dashboard'))
-        
-        # Validate messages
-        total_messages = sum(len(msgs) for msgs in parsed['messages_by_person'].values())
-        if total_messages < 10:
-            flash('Not enough messages found in the chat. Please upload a chat with more conversation history.')
-            return redirect(url_for('dashboard'))
-        
-        # Create temporary ChatData entry
-        temp_chat = ChatData(
-            user_id=current_user.id,
-            selected_person=None,
-            all_messages=json.dumps(parsed['messages_by_person']),
-            messages='[]',
-            conversation_history='[]',
-            is_temp=True
-        )
-        db.session.add(temp_chat)
-        db.session.commit()
-        
-        return redirect(url_for('select_person', chat_id=temp_chat.id))
-    
-    except UnicodeDecodeError as e:
-        flash('Error reading file: The file encoding is not supported. Please ensure it\'s a text file exported from WhatsApp.')
-        return redirect(url_for('dashboard'))
-    
-    except ValueError as e:
-        # Specific parsing errors from parse_chat_file
-        error_msg = str(e)
-        if 'participants' in error_msg.lower():
-            flash('The chat file must contain messages from at least 2 different people. Please check your WhatsApp export.')
-        elif 'valid' in error_msg.lower():
-            flash(f'{error_msg} Make sure you exported the chat correctly from WhatsApp.')
-        else:
-            flash(f'Error parsing chat: {error_msg}')
-        return redirect(url_for('dashboard'))
-    
-    except json.JSONDecodeError as e:
-        flash('Error processing chat data. Please try uploading the file again.')
-        return redirect(url_for('dashboard'))
-    
-    except Exception as e:
-        # Log the error for debugging
-        print(f"Unexpected error in upload_file: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        flash('An unexpected error occurred while processing your file. Please ensure it\'s a valid WhatsApp chat export (.txt file).')
-        return redirect(url_for('dashboard'))
-
-@app.route('/select_person', methods=['GET', 'POST'])
-@login_required
-def select_person():
-    if request.method == 'POST':
-        person_name = request.form['person']
-        chat_id = request.form.get('chat_id', type=int)
-        
-        if not chat_id:
-            flash('Invalid chat ID.')
-            return redirect(url_for('dashboard'))
-        
-        # Load temp ChatData
-        temp_chat = ChatData.query.filter_by(id=chat_id, user_id=current_user.id, is_temp=True).first()
-        if not temp_chat:
-            flash('Chat data not found or expired.')
-            return redirect(url_for('dashboard'))
-        
-        # Extract messages for selected person
-        all_messages_dict = json.loads(temp_chat.all_messages)
-        selected_msgs = all_messages_dict.get(person_name, [])
-        
-        if not selected_msgs:
-            flash('No messages found for the selected person.')
-            return redirect(url_for('dashboard'))
-        
-        # Use more of the chat: first 300 messages
-        selected_msgs = selected_msgs[:300]
-        
-        # Update the temp chat to permanent
-        temp_chat.selected_person = person_name
-        temp_chat.messages = json.dumps(selected_msgs)
-        temp_chat.conversation_history = '[]'
-        temp_chat.is_temp = False
-        temp_chat.all_messages = ''  # Clear temp data to save space
-        db.session.commit()
-        
-        return redirect(url_for('chat', chat_id=chat_id))
-    
-    # GET: Show selection page
-    chat_id = request.args.get('chat_id', type=int)
-    if not chat_id:
-        flash('No chat ID provided.')
-        return redirect(url_for('dashboard'))
-    
-    temp_chat = ChatData.query.filter_by(id=chat_id, user_id=current_user.id, is_temp=True).first()
-    if not temp_chat:
-        flash('Chat data not found or expired.')
-        return redirect(url_for('dashboard'))
-    
-    all_messages_dict = json.loads(temp_chat.all_messages)
-    participants = [{'name': name, 'count': len(msgs)} for name, msgs in all_messages_dict.items()]
-    sorted_participants = sorted(participants, key=lambda x: x['count'], reverse=True)
-    
-    return render_template('select_person.html', participants=sorted_participants, chat_id=chat_id)
-
-@app.route('/chat/<int:chat_id>')
-@login_required
-def chat(chat_id):
-    chat_data = ChatData.query.filter_by(user_id=current_user.id, id=chat_id, is_temp=False).first()
-    if not chat_data:
-        flash('Chat not found or not ready.')
-        return redirect(url_for('dashboard'))
-    
-    return render_template('chat.html', chat_id=chat_id, person=chat_data.selected_person)
 
 '''@app.route('/api/chat/<int:chat_id>', methods=['POST'])
 @app.route('/api/chat/<int:chat_id>/message', methods=['POST'])  # Alias for backward compatibility
