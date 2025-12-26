@@ -2,6 +2,7 @@
 const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
 const PRODUCTION_API_URL = 'https://botme-ai.onrender.com'
 const baseURL = import.meta.env.VITE_API_URL || (isProduction ? PRODUCTION_API_URL : '')
+console.log('[API Config] Production:', isProduction, '| Base URL:', baseURL || '(using proxy)')
 
 const requestInterceptors = []
 
