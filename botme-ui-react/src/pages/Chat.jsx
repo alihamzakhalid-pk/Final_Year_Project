@@ -82,33 +82,33 @@ export default function Chat() {
 
     const loadContext = async () => {
       if (cancelled) return
-      
+
       setLoading(true)
       setError('')
 
       try {
         console.log(`[Chat] Loading context for chat ${chatId}`)
         setDebugInfo({ status: 'loading', message: `Fetching chat ${chatId}...`, timestamp: new Date().toISOString() })
-        
+
         const response = await api.get(`/api/chat/${chatId}/context`)
         console.log(`[Chat] API Response:`, response)
-        
+
         if (cancelled) return
 
         const data = response?.data || response
-        console.log(`[Chat] Received data:`, { 
-          is_temp: data?.is_temp, 
-          ready: data?.ready, 
+        console.log(`[Chat] Received data:`, {
+          is_temp: data?.is_temp,
+          ready: data?.ready,
           selected_person: data?.selected_person,
           history_length: data?.history?.length,
           full_data: data
         })
-        
-        setDebugInfo({ 
-          status: 'success', 
-          message: 'Chat loaded successfully', 
+
+        setDebugInfo({
+          status: 'success',
+          message: 'Chat loaded successfully',
           data: data,
-          timestamp: new Date().toISOString() 
+          timestamp: new Date().toISOString()
         })
 
         // Only redirect to select if chat is temp (not ready) AND has no selected person
@@ -125,7 +125,7 @@ export default function Chat() {
         const personaName = data?.selected_person || location.state?.person || ''
         console.log(`[Chat] Setting persona: ${personaName}`)
         setSelectedPerson(personaName)
-        
+
         // Load conversation history
         const history = Array.isArray(data?.history) ? data.history : []
         if (history.length) {
@@ -143,7 +143,7 @@ export default function Chat() {
         console.log(`[Chat] Chat loaded successfully`)
       } catch (fetchError) {
         if (cancelled) return
-        
+
         console.error(`[Chat] Error loading chat:`, fetchError)
         console.error(`[Chat] Error details:`, {
           message: fetchError?.message,
@@ -151,7 +151,7 @@ export default function Chat() {
           data: fetchError?.data,
           stack: fetchError?.stack
         })
-        
+
         // Set debug info for error
         setDebugInfo({
           status: 'error',
@@ -164,17 +164,17 @@ export default function Chat() {
           },
           timestamp: new Date().toISOString()
         })
-        
+
         // Get status from error object (custom axios uses error.status)
         const status = fetchError?.status
-        
+
         if (status === 404 && retryCount < maxRetries) {
           retryCount++
           console.log(`[Chat] Chat ${chatId} not found, retrying... (${retryCount}/${maxRetries})`)
           await new Promise((resolve) => setTimeout(resolve, retryDelay))
           return loadContext()
         }
-        
+
         if (status === 404) {
           console.log(`[Chat] Chat ${chatId} not found after retries`)
           setError('Chat session not found. It may have expired or been deleted. Please return to the dashboard and upload a new chat.')
@@ -196,7 +196,7 @@ export default function Chat() {
           }, 2000)
         } else if (status === 0 || !status) {
           // Network/connection errors (status 0 means no response)
-          const errorMsg = fetchError?.message || 'Cannot connect to server. Please ensure the backend is running on http://127.0.0.1:5000'
+          const errorMsg = fetchError?.message || 'Cannot connect to server. Please check your connection and try again.'
           console.log(`[Chat] Network error, showing helpful message:`, errorMsg)
           setError(errorMsg)
           // Still try to show chat if we have persona from location state
@@ -265,7 +265,7 @@ export default function Chat() {
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, assistantReply])
-      
+
       // Refresh personas list to update last chat date
       const response = await api.get('/api/personas')
       setPersonas(response.data?.personas || [])
@@ -472,11 +472,10 @@ export default function Chat() {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     onClick={() => handleSwitchPersona(persona.chat_id)}
-                    className={`group relative flex items-center gap-3 px-5 py-4 cursor-pointer transition-all ${
-                      isActive
+                    className={`group relative flex items-center gap-3 px-5 py-4 cursor-pointer transition-all ${isActive
                         ? 'bg-[#EFF6FF] border-l-4 border-[#5B7FFF]'
                         : 'hover:bg-[#F9FAFB]'
-                    }`}
+                      }`}
                     style={{ height: '72px' }}
                   >
                     <Avatar name={persona.name} size={40} />
@@ -574,8 +573,8 @@ export default function Chat() {
                 <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
                   <strong>💡 Troubleshooting:</strong>
                   <ul className="list-disc list-inside mt-1 space-y-1 text-yellow-800">
-                    <li>Make sure Flask backend is running: <code className="bg-yellow-100 px-1 rounded">python app.py</code></li>
-                    <li>Check if server is running on <code className="bg-yellow-100 px-1 rounded">http://127.0.0.1:5000</code></li>
+                    <li>Check your internet connection</li>
+                    <li>The server may be temporarily unavailable - try again in a moment</li>
                     <li>Open browser console (F12) and check Network tab for failed requests</li>
                     <li>Verify CORS settings in Flask app allow requests from your frontend</li>
                   </ul>
@@ -613,9 +612,9 @@ export default function Chat() {
 
         {/* Message Input - Fixed at bottom */}
         <div className="flex-shrink-0">
-          <MessageInput 
-            onSend={handleSend} 
-            disabled={typing || !selectedPerson || (loading && !selectedPerson)} 
+          <MessageInput
+            onSend={handleSend}
+            disabled={typing || !selectedPerson || (loading && !selectedPerson)}
           />
         </div>
       </div>

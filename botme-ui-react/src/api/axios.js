@@ -1,8 +1,10 @@
-// Use VITE_API_URL if set, otherwise detect production vs development
-const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-const PRODUCTION_API_URL = 'https://botme-ai.onrender.com'
-const baseURL = import.meta.env.VITE_API_URL || (isProduction ? PRODUCTION_API_URL : '')
-console.log('[API Config] Production:', isProduction, '| Base URL:', baseURL || '(using proxy)')
+// API Base URL Configuration
+// In production (Render), use the deployed backend URL
+// In development (localhost), use empty string for Vite proxy
+const isLocalhost = typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+const baseURL = isLocalhost ? '' : 'https://botme-ai.onrender.com'
+console.log('[API] Using base URL:', baseURL || '(localhost proxy)')
 
 const requestInterceptors = []
 
@@ -90,13 +92,14 @@ const execute = async (config) => {
     // Handle network errors and fetch failures
     if (error instanceof TypeError) {
       if (error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
-        const networkError = new Error('Network error: Could not reach the server. Please ensure:\n1. Backend server is running on http://127.0.0.1:5000\n2. No firewall is blocking the connection\n3. Check browser console for CORS errors')
+        const apiUrl = baseURL || 'the backend server'
+        const networkError = new Error(`Network error: Could not reach ${apiUrl}. This may be a CORS issue or the server is not responding.`)
         networkError.status = 0
-        networkError.data = { originalError: error.message, type: 'network_error' }
+        networkError.data = { originalError: error.message, type: 'network_error', apiUrl: baseURL }
         throw networkError
       }
       if (error.message.includes('cached') || error.message.includes('unavailable')) {
-        const cacheError = new Error('Connection error: Resource unavailable. The backend server may not be running or accessible. Please check if Flask server is running on port 5000.')
+        const cacheError = new Error('Connection error: Server temporarily unavailable. Please try again.')
         cacheError.status = 0
         cacheError.data = { originalError: error.message, type: 'connection_error' }
         throw cacheError

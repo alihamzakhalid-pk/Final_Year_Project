@@ -41,13 +41,13 @@ export default function usePersonalityAnalysis(chatId, personName) {
       try {
         setLoading(true)
         setError(null)
-        
+
         // Ensure chatId is a number
         const numericChatId = parseInt(chatId, 10)
         if (isNaN(numericChatId)) {
           throw new Error(`Invalid chat ID: ${chatId}`)
         }
-        
+
         console.log(`[usePersonalityAnalysis] Fetching analysis for chat ${numericChatId}`)
         const response = await api.get(`/api/personality/${numericChatId}`)
         const data = response.data
@@ -61,10 +61,10 @@ export default function usePersonalityAnalysis(chatId, personName) {
         }
       } catch (err) {
         console.error('Failed to fetch personality analysis:', err)
-        
+
         // Provide more specific error messages
         let errorMessage = 'Failed to load personality analysis'
-        
+
         if (err.status === 404) {
           const errorData = err.data || {}
           if (errorData.ready_chat_ids && errorData.ready_chat_ids.length > 0) {
@@ -79,13 +79,13 @@ export default function usePersonalityAnalysis(chatId, personName) {
         } else if (err.status === 400) {
           errorMessage = err.data?.error || 'Chat is not ready for analysis. Please ensure a persona is selected and messages exist.'
         } else if (err.status === 0) {
-          errorMessage = 'Cannot connect to server. Please ensure the backend is running on http://127.0.0.1:5000'
+          errorMessage = 'Cannot connect to server. Please check your internet connection and try again.'
         } else if (err.data?.error) {
           errorMessage = err.data.error
         } else if (err.message) {
           errorMessage = err.message
         }
-        
+
         setError(errorMessage)
         setAnalysis(null)
       } finally {
