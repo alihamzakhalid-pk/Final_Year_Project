@@ -27,10 +27,15 @@ app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
 
-# Enable CORS for SPA - ALLOW ALL ORIGINS for deployment troubleshooting
-# This is permissive to ensure it works. Lock down after verification.
+# Enable CORS for SPA
+# IMPORTANT: When supports_credentials=True, origins cannot be "*"
+# Must use explicit origins
 CORS(app, 
-     resources={r"/*": {"origins": "*"}},
+     origins=[
+         "https://botme-ai-frontend.onrender.com",
+         "http://localhost:5173",
+         "http://127.0.0.1:5173"
+     ],
      supports_credentials=True,
      allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
