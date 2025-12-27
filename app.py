@@ -27,30 +27,13 @@ app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
 
-# Enable CORS for SPA - supports both development and production
-frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
-CORS(
-    app,
-    resources={r"/api/*": {
-        "origins": [
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            frontend_url,  # Production frontend URL from env
-            "https://botme-ai-frontend.onrender.com",  # Explicit Render frontend
-        ],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
-    }, r"/auth/*": {
-        "origins": [
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            frontend_url,
-            "https://botme-ai-frontend.onrender.com",
-        ],
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
-    }},
-    supports_credentials=True,
+# Enable CORS for SPA - ALLOW ALL ORIGINS for deployment troubleshooting
+# This is permissive to ensure it works. Lock down after verification.
+CORS(app, 
+     resources={r"/*": {"origins": "*"}},
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 )
 
 login_manager = LoginManager()
