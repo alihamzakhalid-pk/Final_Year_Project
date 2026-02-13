@@ -1,7 +1,20 @@
-// API Base URL from environment variable
-// Local: VITE_API_BASE_URL is empty/unset → uses Vite proxy (relative URLs)
-// Production: VITE_API_BASE_URL=https://botme-ai.onrender.com
-const baseURL = import.meta.env.VITE_API_BASE_URL || ''
+// API Base URL
+// 1. Env Var (Best Practice)
+// 2. Fallback to hardcoded Production URL if missing (Robustness)
+// 3. Empty for Localhost (uses Vite proxy)
+const getBaseUrl = () => {
+  if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL
+
+  // If no env var, and we are NOT on localhost, assume production
+  if (!window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
+    console.warn('[API] VITE_API_BASE_URL not set. Falling back to production default.')
+    return 'https://botme-ai.onrender.com'
+  }
+
+  return ''
+}
+
+const baseURL = getBaseUrl()
 console.log('[API] Using base URL:', baseURL || '(dev proxy)')
 
 const requestInterceptors = []
