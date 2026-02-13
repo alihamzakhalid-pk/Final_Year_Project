@@ -1025,88 +1025,7 @@ def api_personality_analysis(chat_id):
         print(f"[PERSONALITY] ====== END ERROR ======")
         return jsonify({'error': f'Failed to analyze personality: {str(e)}'}), 500
 
-# OAuth Endpoints
-@app.route('/api/oauth/<provider>', methods=['GET', 'OPTIONS'])
-def oauth_login(provider):
-    """Initiate OAuth flow for a provider"""
-    try:
-        provider = provider.lower()
-        if provider not in ['google', 'facebook', 'microsoft', 'github']:
-            return jsonify({'error': f'Provider {provider} not supported'}), 400
-        
-        auth_url = get_oauth_auth_url(provider)
-        if not auth_url:
-            return jsonify({
-                'error': f'{provider.capitalize()} OAuth is not configured. Please set {provider.upper()}_CLIENT_ID and {provider.upper()}_CLIENT_SECRET in environment variables.'
-            }), 500
-        
-        return jsonify({'auth_url': auth_url})
-    except Exception as e:
-        print(f"Error in oauth_login for {provider}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
-@app.route('/api/oauth/<provider>/callback', methods=['GET'])
-def oauth_callback(provider):
-    """Handle OAuth callback from provider"""
-    provider = provider.lower()
-    code = request.args.get('code')
-    state = request.args.get('state')
-    error = request.args.get('error')
-    
-    # Get frontend URL from config or request
-    frontend_url = app.config.get('FRONTEND_URL', 'http://localhost:5173')
-    
-    print(f"[OAUTH] Callback received for {provider}")
-    print(f"[OAUTH] State: {state}, Code: {'present' if code else 'missing'}, Error: {error}")
-    
-    if error:
-        print(f"[OAUTH] Error from provider: {error}")
-        return redirect(f"{frontend_url}/login?oauth_error={error}&provider={provider}")
-    
-    # Verify state - be more lenient for development
-    session_state = session.get(f'oauth_state_{provider}')
-    print(f"[OAUTH] Session state: {session_state}")
-    
-    if not session_state or session_state != state:
-        print(f"[OAUTH] State mismatch! Expected: {session_state}, Got: {state}")
-        # In development, allow if state is present (session might not persist across redirects)
-        if not state:
-            return redirect(f"{frontend_url}/login?oauth_error=invalid_state&provider={provider}")
-        print("[OAUTH] Allowing despite state mismatch (development mode)")
-    
-    session.pop(f'oauth_state_{provider}', None)
-    
-    if not code:
-        return redirect(f"{frontend_url}/login?oauth_error=no_code&provider={provider}")
-    
-    # Exchange code for token
-    redirect_uri = f"{request.host_url.rstrip('/')}/api/oauth/{provider}/callback"
-    
-    try:
-        user_info = exchange_oauth_code(provider, code, redirect_uri)
-        if not user_info:
-            print("[OAUTH] Token exchange failed - no user info returned")
-            return redirect(f"{frontend_url}/login?oauth_error=token_exchange_failed&provider={provider}")
-        
-        print(f"[OAUTH] User info received: {user_info.get('email')}")
-        
-        # Create or get user
-        user = get_or_create_oauth_user(provider, user_info)
-        if user:
-            login_user(user)
-            print(f"[OAUTH] User logged in successfully: {user.email}")
-            # Redirect to dashboard on success (not login page)
-            return redirect(f"{frontend_url}/dashboard?oauth_success=true&provider={provider}")
-        else:
-            print("[OAUTH] User creation failed")
-            return redirect(f"{frontend_url}/login?oauth_error=user_creation_failed&provider={provider}")
-    except Exception as e:
-        print(f"[OAUTH] Error for {provider}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return redirect(f"{frontend_url}/login?oauth_error={urllib.parse.quote(str(e))}&provider={provider}")
 
 # Apple Sign In (special handling - requires frontend SDK)
 @app.route('/api/oauth/apple', methods=['POST'])
@@ -1123,17 +1042,7 @@ def apple_oauth():
 
 # ==================== ADMIN API ENDPOINTS ====================
 
-def admin_required(f):
-    """Decorator to require admin access"""
-    from functools import wraps
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated:
-            return jsonify({'error': 'Authentication required'}), 401
-        if not getattr(current_user, 'is_admin', False):
-            return jsonify({'error': 'Admin access required'}), 403
-        return f(*args, **kwargs)
-    return decorated_function
+
 
 
 @app.route('/api/admin/stats', methods=['GET'])
