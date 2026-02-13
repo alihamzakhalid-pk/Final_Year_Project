@@ -54,6 +54,17 @@ def generate_verification_code():
     return ''.join(random.choices(string.digits, k=6))
 
 
+from threading import Thread
+
+def send_async_email(app_instance, msg):
+    """Send email in a background thread"""
+    with app_instance.app_context():
+        try:
+            mail.send(msg)
+            print(f"[EMAIL] Successfully sent email to {msg.recipients}")
+        except Exception as e:
+            print(f"[EMAIL ERROR] Failed to send email: {str(e)}")
+
 def send_verification_email(email, code, purpose='signup'):
     """Send verification or reset code email"""
     try:
@@ -94,16 +105,19 @@ Best regards,
 BotMe Team
 """
 
-        print(f"[EMAIL] Attempting to send email to {email} via {app.config.get('MAIL_SERVER')}:{app.config.get('MAIL_PORT')}")
+        print(f"[EMAIL] Attempting to send email to {email}")
         msg = Message(subject=subject, recipients=[email], body=body)
-        mail.send(msg)
-        print(f"[EMAIL] Successfully sent verification code to {email}")
+        
+        # Send asynchronously!
+        # Use app._get_current_object() if app is not globally available/preferred, 
+        # but here we have 'app' from line 26
+        Thread(target=send_async_email, args=(app, msg)).start()
+        
         return True
     except Exception as e:
-        print(f"[EMAIL ERROR] Failed to send email: {type(e).__name__}: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        print(f"[EMAIL ERROR] Error preparing email: {str(e)}")
         return False
+
 
 
 def serialize_user(user):
