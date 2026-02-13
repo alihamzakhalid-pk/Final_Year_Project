@@ -137,9 +137,19 @@ def unauthorized():
         return jsonify({'error': 'Unauthorized'}), 401
     return redirect(url_for('login'))
 
+from functools import wraps
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not getattr(current_user, 'is_admin', False):
+            return jsonify({'error': 'Admin privileges required'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Create DB tables and clean up old temp entries on startup
 with app.app_context():
