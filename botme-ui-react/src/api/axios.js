@@ -3,7 +3,9 @@
 // 2. Fallback to hardcoded Production URL if missing (Robustness)
 // 3. Empty for Localhost (uses Vite proxy)
 const getBaseUrl = () => {
+  // Check both variable names (VITE_API_BASE_URL is preferred, but VITE_API_URL is common/legacy)
   if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
 
   // If no env var, and we are NOT on localhost, assume production
   if (!window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
