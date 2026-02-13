@@ -78,22 +78,7 @@ If you didn't request this code, please ignore this email.
 Best regards,
 BotMe Team
 """
-        elif purpose == 'login':
-            subject = f"Your BotMe Login Code - {code}"
-            body = f"""
-Hello!
 
-Please use the following verification code to complete your login:
-
-Verification Code: {code}
-
-This code will expire in 10 minutes.
-
-If you didn't request this code, please ignore this email.
-
-Best regards,
-BotMe Team
-"""
         else:  # password reset
             subject = "Reset your BotMe password"
             body = f"""
@@ -397,50 +382,7 @@ def api_login():
     }), 200
 
 
-@app.route('/api/verify-login', methods=['POST'])
-def api_verify_login():
-    """Verify code and login"""
-    data = request.json or {}
-    email = (data.get('email') or '').strip().lower()
-    code = data.get('code', '').strip()
-    
-    if not email or not code:
-        return jsonify({'error': 'Missing email or verification code'}), 400
-    
-    # Find verification code
-    verification = VerificationCode.query.filter_by(
-        email=email, 
-        code=code, 
-        purpose='login'
-    ).first()
-    
-    if not verification:
-        return jsonify({'error': 'Invalid verification code'}), 400
-    
-    if verification.is_expired():
-        db.session.delete(verification)
-        db.session.commit()
-        return jsonify({'error': 'Verification code has expired. Please request a new one.'}), 400
-    
-    # Find user
-    user = User.query.filter_by(email=email).first()
-    if not user:
-        db.session.delete(verification)
-        db.session.commit()
-        return jsonify({'error': 'User not found'}), 404
-    
-    # Delete verification code
-    db.session.delete(verification)
-    db.session.commit()
-    
-    # Login user
-    login_user(user)
-    
-    return jsonify({
-        'message': 'Logged in successfully',
-        'user': serialize_user(user),
-        'token': 'session'
-    }), 200
+
 
 
 @app.route('/api/request-password-reset', methods=['POST'])
