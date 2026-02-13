@@ -1,23 +1,19 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Mail } from 'lucide-react'
 import AuthForm from '../components/AuthForm'
-import VerificationCodeInput from '../components/VerificationCodeInput'
 import UICard from '../components/ui/Card'
 import UIButton from '../components/ui/Button'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../components/ui/Toast'
 
 export default function Login() {
-  const { login, verifyLogin, oauthLogin } = useAuth()
+  const { login, oauthLogin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const { showSuccess, showError } = useToast()
   const from = location.state?.from || '/dashboard'
-  const [step, setStep] = useState('form') // 'form' or 'verify'
-  const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
 
   // Handle OAuth callback
@@ -100,99 +96,27 @@ export default function Login() {
             </div>
           </div>
 
-          {step === 'form' ? (
-            /* Email Login Form */
-            <AuthForm
-              mode="login"
-              onSubmit={async ({ email, password, identifier }) => {
-                try {
-                  setLoading(true)
-                  const data = await login({ email, identifier, password })
-                  // Direct login - navigate to dashboard immediately
-                  if (data?.user) {
-                    showSuccess('Logged in successfully!')
-                    navigate(from, { replace: true })
-                  } else {
-                    // Fallback for verification flow (if ever needed)
-                    const userEmail = data?.email || email || identifier
-                    setEmail(userEmail)
-                    setStep('verify')
-                    showSuccess('Verification code sent to your email!')
-                  }
-                } catch (error) {
-                  showError(error?.message || 'Login failed. Please try again.')
-                } finally {
-                  setLoading(false)
+          {/* Email Login Form */}
+          <AuthForm
+            mode="login"
+            onSubmit={async ({ email, password, identifier }) => {
+              try {
+                setLoading(true)
+                const data = await login({ email, identifier, password })
+                if (data?.user) {
+                  showSuccess('Logged in successfully!')
+                  navigate(from, { replace: true })
+                } else {
+                  showError('Login failed. Unexpected response from server.')
                 }
-              }}
-              disabled={loading}
-            />
-          ) : (
-            /* Verification Step */
-            <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#E8F0FF] dark:bg-slate-700 mb-4"
-                >
-                  <Mail className="h-8 w-8 text-[#5B7FFF]" />
-                </motion.div>
-                <h2 className="text-2xl font-bold text-[#1F2937] dark:text-slate-100">Check your email</h2>
-                <p className="text-sm text-[#6B7280] dark:text-slate-400">
-                  We've sent a 6-digit verification code to
-                  <br />
-                  <span className="font-semibold text-[#1F2937] dark:text-slate-200">{email}</span>
-                </p>
-              </div>
-
-              <VerificationCodeInput
-                length={6}
-                onComplete={async (code) => {
-                  try {
-                    setLoading(true)
-                    await verifyLogin({ email, code })
-                    showSuccess('Logged in successfully!')
-                    navigate(from, { replace: true })
-                  } catch (error) {
-                    showError(error?.message || 'Invalid verification code. Please try again.')
-                  } finally {
-                    setLoading(false)
-                  }
-                }}
-                disabled={loading}
-              />
-
-              <div className="text-center space-y-3">
-                <button
-                  onClick={() => setStep('form')}
-                  className="mx-auto text-sm text-[#6B7280] dark:text-slate-400 hover:text-[#5B7FFF]"
-                  disabled={loading}
-                >
-                  Back to login form
-                </button>
-                <p className="text-xs text-[#6B7280] dark:text-slate-400">
-                  Didn't receive the code? Check your spam folder or{' '}
-                  <button
-                    onClick={async () => {
-                      try {
-                        setLoading(true)
-                        showError('Please go back and submit the form again to resend the code.')
-                      } catch (error) {
-                        showError('Failed to resend code. Please try again.')
-                      } finally {
-                        setLoading(false)
-                      }
-                    }}
-                    className="text-[#5B7FFF] hover:underline"
-                    disabled={loading}
-                  >
-                    resend
-                  </button>
-                </p>
-              </div>
-            </div>
-          )}
+              } catch (error) {
+                showError(error?.message || 'Login failed. Please check your credentials and try again.')
+              } finally {
+                setLoading(false)
+              }
+            }}
+            disabled={loading}
+          />
 
           <p className="text-center text-sm text-[#6B7280] dark:text-slate-400 mt-6">
             New here?{' '}
