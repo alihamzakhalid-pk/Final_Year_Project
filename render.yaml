@@ -36,5 +36,5 @@ services:
     buildCommand: cd botme-ui-react && npm install && npm run build
     staticPublishPath: botme-ui-react/dist
     envVars:
-      - key: VITE_API_URL
+      - key: VITE_API_BASE_URL
         sync: false
