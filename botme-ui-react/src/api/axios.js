@@ -38,7 +38,9 @@ const parseJson = async (response) => {
   try {
     return JSON.parse(text)
   } catch (error) {
-    return {}
+    // If parsing fails (e.g. HTML response from 404/500), throw error
+    console.error('[API] Failed to parse JSON:', text.slice(0, 150))
+    throw new Error('Received invalid response from server (expected JSON)')
   }
 }
 
