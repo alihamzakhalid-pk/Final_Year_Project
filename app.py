@@ -382,6 +382,59 @@ def api_login():
     }), 200
 
 
+# ==========================================
+# OAUTH ROUTES (Google, Facebook, etc.)
+# ==========================================
+
+@app.route('/api/oauth/<provider>/login')
+def oauth_login(provider):
+    """Initiate OAuth login flow"""
+    auth_url = get_oauth_auth_url(provider)
+    if not auth_url:
+        return jsonify({'error': f'Unsupported provider {provider} or missing configuration'}), 400
+    return redirect(auth_url)
+
+
+@app.route('/api/oauth/<provider>/callback')
+def oauth_callback(provider):
+    """Handle OAuth callback"""
+    code = request.args.get('code')
+    error = request.args.get('error')
+    
+    if error:
+        return jsonify({'error': f'Provider error: {error}'}), 400
+        
+    if not code:
+        return jsonify({'error': 'Missing authorization code'}), 400
+    
+    # Construct the same redirect URI used to start the flow
+    # Logic matches oauth_handler.py default
+    if provider == 'google' and app.config.get('GOOGLE_REDIRECT_URI'):
+        redirect_uri = app.config['GOOGLE_REDIRECT_URI']
+    else:
+        # Must match the one generated in get_oauth_auth_url
+        redirect_uri = url_for('oauth_callback', provider=provider, _external=True)
+        # Ensure 'http' vs 'https' matches what Render usage expects if behind proxy
+        if request.headers.get('X-Forwarded-Proto') == 'https':
+            redirect_uri = redirect_uri.replace('http:', 'https:')
+
+    user_info = exchange_oauth_code(provider, code, redirect_uri)
+    if not user_info:
+        return jsonify({'error': 'Failed to authenticate with provider. Token exchange failed.'}), 401
+    
+    # Get or create local user account
+    user = get_or_create_oauth_user(provider, user_info)
+    if not user:
+         return jsonify({'error': 'Failed to create or retrieve user'}), 500
+         
+    # Login the user
+    login_user(user)
+    
+    # Redirect to Frontend Dashboard
+    frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+    return redirect(f"{frontend_url}/dashboard")
+
+
 
 
 
