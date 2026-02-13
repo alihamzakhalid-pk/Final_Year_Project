@@ -1,10 +1,8 @@
-// API Base URL Configuration
-// In production (Render), use the deployed backend URL
-// In development (localhost), use empty string for Vite proxy
-const isLocalhost = typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-const baseURL = isLocalhost ? '' : 'https://botme-ai.onrender.com'
-console.log('[API] Using base URL:', baseURL || '(localhost proxy)')
+// API Base URL from environment variable
+// Local: VITE_API_BASE_URL is empty/unset → uses Vite proxy (relative URLs)
+// Production: VITE_API_BASE_URL=https://botme-ai.onrender.com
+const baseURL = import.meta.env.VITE_API_BASE_URL || ''
+console.log('[API] Using base URL:', baseURL || '(dev proxy)')
 
 const requestInterceptors = []
 
