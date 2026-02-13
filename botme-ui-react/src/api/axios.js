@@ -16,7 +16,7 @@ const getBaseUrl = () => {
   return ''
 }
 
-const baseURL = getBaseUrl()
+export const baseURL = getBaseUrl()
 console.log('[API] Using base URL:', baseURL || '(dev proxy)')
 
 const requestInterceptors = []

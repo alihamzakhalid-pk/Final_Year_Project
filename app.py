@@ -23,6 +23,20 @@ from rag_chatbot import (
     delete_vector_store
 )
 
+import socket
+
+# Force IPv4 for Gmail SMTP to avoid [Errno 101] Network is unreachable on Render
+# This monkey-patches socket.getaddrinfo to only return IPv4 addresses for smtp.gmail.com
+_orig_getaddrinfo = socket.getaddrinfo
+
+def _patched_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    if host == 'smtp.gmail.com':
+        family = socket.AF_INET
+    return _orig_getaddrinfo(host, port, family, type, proto, flags)
+
+socket.getaddrinfo = _patched_getaddrinfo
+
+
 app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
