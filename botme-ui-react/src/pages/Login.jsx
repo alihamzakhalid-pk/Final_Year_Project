@@ -1,36 +1,36 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-<<<<<<< HEAD
-import { Mail } from 'lucide-react'
+import { Mail, Lock, ShieldCheck } from 'lucide-react'
 import { GoogleLogin } from '@react-oauth/google'
-=======
->>>>>>> fd28afaa34a6b3ca12c30b0ca85f5283dd59e554
 import AuthForm from '../components/AuthForm'
 import UICard from '../components/ui/Card'
 import UIButton from '../components/ui/Button'
+import UIInputField from '../components/ui/InputField'
+import PasswordStrength from '../components/ui/PasswordStrength'
+import VerificationCodeInput from '../components/VerificationCodeInput'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../components/ui/Toast'
 import api from '../api/axios'
 
 export default function Login() {
-<<<<<<< HEAD
-  const { login, verifyLogin } = useAuth()
-=======
-  const { login, oauthLogin } = useAuth()
->>>>>>> fd28afaa34a6b3ca12c30b0ca85f5283dd59e554
+  const { login, setUserDirect } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const { showSuccess, showError } = useToast()
   const from = location.state?.from || '/dashboard'
-<<<<<<< HEAD
-  const [step, setStep] = useState('form') // 'form' or 'verify' or 'google_verify'
-  const [email, setEmail] = useState('')
-  const [googleEmail, setGoogleEmail] = useState('')
-=======
->>>>>>> fd28afaa34a6b3ca12c30b0ca85f5283dd59e554
+
+  // Steps: 'form' | 'google_password' | 'google_verify'
+  const [step, setStep] = useState('form')
   const [loading, setLoading] = useState(false)
+
+  // Google OAuth state
+  const [googleEmail, setGoogleEmail] = useState('')
+  const [googleName, setGoogleName] = useState('')
+  const [googlePassword, setGooglePassword] = useState('')
+  const [googleConfirm, setGoogleConfirm] = useState('')
+  const [passwordError, setPasswordError] = useState('')
 
   // Handle OAuth callback (if coming from old redirect flow)
   useEffect(() => {
@@ -48,36 +48,84 @@ export default function Login() {
       setLoading(true)
       const token = credentialResponse.credential
 
-      // Send JWT token to backend
-      const { data } = await api.post('/api/oauth/google/callback', { token })
+      console.log('[OAUTH] Sending Google ID token to backend...')
+      const { data } = await api.post('/api/oauth/google/id-token', { token })
 
-      if (data?.requiresVerification) {
-        // New user - show verification step
-        setGoogleEmail(data.email)
-        setStep('google_verify')
-        showSuccess('Verification code sent to your email!')
-        // In dev mode, show the code
+      console.log('[OAUTH] Backend response:', { new_user: data?.new_user })
+
+      if (data?.new_user === true) {
+        // New user → show password setup step
+        console.log('[OAUTH] New user detected, showing password setup')
+        setGoogleEmail(data.email || '')
+        setGoogleName(data.name || '')
+        setStep('google_password')
+        showSuccess('Google account verified! Please set a password for your account.')
         if (data?.devMode && data?.code) {
-          showSuccess(`Dev mode - Code: ${data.code}`)
+          showSuccess(`Dev mode - Verification code: ${data.code}`)
         }
-      } else if (data?.user) {
-        // Existing user - login directly
+      } else {
+        // Existing user → logged in directly
+        console.log('[OAUTH] Existing user, redirecting to dashboard')
+        if (data?.user) {
+          setUserDirect(data.user)
+        }
         showSuccess('Logged in successfully!')
         setTimeout(() => {
-          navigate(from, { replace: true })
+          navigate('/dashboard', { replace: true })
         }, 500)
       }
     } catch (error) {
-      console.error('Google login error:', error)
-      showError(error?.response?.data?.error || error?.message || 'Google login failed')
+      console.error('[OAUTH] Google login error:', error)
+      showError(error?.message || error?.data?.error || 'Google login failed')
     } finally {
       setLoading(false)
     }
   }
 
   const handleGoogleError = () => {
-    showError('Google login failed. Please try again.')
-    setLoading(false)
+    console.error('[OAUTH] Google login dismissed')
+    showError('Google login cancelled')
+  }
+
+  const handlePasswordSubmit = (e) => {
+    e.preventDefault()
+    setPasswordError('')
+
+    if (!googlePassword || googlePassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters')
+      return
+    }
+    if (googlePassword !== googleConfirm) {
+      setPasswordError('Passwords do not match')
+      return
+    }
+
+    // Move to verification code step
+    setStep('google_verify')
+    showSuccess('Now enter the verification code sent to your email.')
+  }
+
+  const handleVerifyComplete = async (code) => {
+    try {
+      setLoading(true)
+      const { data } = await api.post('/api/oauth/google/complete-signup', {
+        email: googleEmail,
+        code: code.trim(),
+        password: googlePassword
+      })
+      if (data?.user) {
+        setUserDirect(data.user)
+        showSuccess('Account created successfully! Redirecting to dashboard...')
+        setTimeout(() => {
+          navigate('/dashboard', { replace: true })
+        }, 800)
+      }
+    } catch (error) {
+      console.error('[OAUTH] Verification error:', error)
+      showError(error?.message || error?.data?.error || 'Invalid verification code. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -103,47 +151,144 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Google OAuth Button - New Popup Method */}
-          <div className="mb-6">
-            <div className="flex justify-center">
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={handleGoogleError}
-                text="signin_with"
-                logo_alignment="center"
+          {/* ====== STEP: FORM (default login) ====== */}
+          {step === 'form' && (
+            <>
+              {/* Google OAuth Button */}
+              <div className="mb-6">
+                <div className="flex justify-center">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    text="signin_with"
+                    logo_alignment="center"
+                  />
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="relative mb-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-200" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white dark:bg-slate-800 px-2 text-[#6B7280] dark:text-slate-400">OR</span>
+                </div>
+              </div>
+
+              {/* Email Login Form */}
+              <AuthForm
+                mode="login"
+                onSubmit={async ({ email, password, identifier }) => {
+                  try {
+                    setLoading(true)
+                    const data = await login({ email, identifier, password })
+                    if (data?.user) {
+                      showSuccess('Logged in successfully!')
+                      navigate(from, { replace: true })
+                    } else {
+                      showError('Login failed. Unexpected response from server.')
+                    }
+                  } catch (error) {
+                    showError(error?.response?.data?.error || error?.message || 'Login failed')
+                  } finally {
+                    setLoading(false)
+                  }
+                }}
+                disabled={loading}
               />
-            </div>
-          </div>
+            </>
+          )}
 
-          {/* Divider */}
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white dark:bg-slate-800 px-2 text-[#6B7280] dark:text-slate-400">OR</span>
-            </div>
-          </div>
+          {/* ====== STEP: GOOGLE PASSWORD SETUP (new users) ====== */}
+          {step === 'google_password' && (
+            <div className="space-y-6">
+              <div className="text-center space-y-2">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#E8F0FF] dark:bg-slate-700 mb-4"
+                >
+                  <Lock className="h-8 w-8 text-[#5B7FFF]" />
+                </motion.div>
+                <h2 className="text-2xl font-bold text-[#1F2937] dark:text-slate-100">Set your password</h2>
+                <p className="text-sm text-[#6B7280] dark:text-slate-400">
+                  Welcome, <span className="font-semibold text-[#1F2937] dark:text-slate-200">{googleName || googleEmail}</span>!
+                  <br />
+                  Create a password for your BotMe account.
+                </p>
+              </div>
 
-          {/* Email Login Form */}
-          <AuthForm
-            mode="login"
-            onSubmit={async ({ email, password, identifier }) => {
-              try {
-                setLoading(true)
-                const data = await login({ email, identifier, password })
-                if (data?.user) {
-                  showSuccess('Logged in successfully!')
-                  navigate(from, { replace: true })
-                } else {
-                  showError('Login failed. Unexpected response from server.')
-                }
-<<<<<<< HEAD
-              }}
-              disabled={loading}
-            />
-          ) : step === 'google_verify' ? (
-            /* Google OAuth Verification Step */
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                <UIInputField
+                  label="Password"
+                  type="password"
+                  value={googlePassword}
+                  onChange={(e) => {
+                    setGooglePassword(e.target.value)
+                    setPasswordError('')
+                  }}
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                  required
+                  icon={<Lock className="h-5 w-5 text-slate-400" />}
+                />
+                {googlePassword && <PasswordStrength password={googlePassword} />}
+
+                <UIInputField
+                  label="Confirm password"
+                  type="password"
+                  value={googleConfirm}
+                  onChange={(e) => {
+                    setGoogleConfirm(e.target.value)
+                    setPasswordError('')
+                  }}
+                  placeholder="Repeat your password"
+                  autoComplete="new-password"
+                  required
+                  icon={<ShieldCheck className="h-5 w-5 text-slate-400" />}
+                />
+
+                {passwordError && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 px-4 py-3 text-sm text-red-700 dark:text-red-300"
+                  >
+                    {passwordError}
+                  </motion.div>
+                )}
+
+                <UIButton
+                  type="submit"
+                  variant="primary"
+                  size="lg"
+                  className="w-full mt-2"
+                  disabled={loading}
+                >
+                  Continue
+                </UIButton>
+              </form>
+
+              <div className="text-center">
+                <button
+                  onClick={() => {
+                    setStep('form')
+                    setGooglePassword('')
+                    setGoogleConfirm('')
+                    setPasswordError('')
+                  }}
+                  className="text-sm text-[#6B7280] dark:text-slate-400 hover:text-[#5B7FFF]"
+                  disabled={loading}
+                >
+                  Back to login
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ====== STEP: GOOGLE VERIFY (enter email code) ====== */}
+          {step === 'google_verify' && (
             <div className="space-y-6">
               <div className="text-center space-y-2">
                 <motion.div
@@ -163,116 +308,24 @@ export default function Login() {
 
               <VerificationCodeInput
                 length={6}
-                onComplete={async (code) => {
-                  try {
-                    setLoading(true)
-                    const { data } = await api.post('/api/oauth/verify-signup', {
-                      email: googleEmail,
-                      code
-                    })
-                    if (data?.user) {
-                      // Store token
-                      localStorage.setItem('auth_token', data.token || 'session')
-                      showSuccess('Account created successfully! Redirecting to dashboard...')
-                      setTimeout(() => {
-                        window.location.href = '/dashboard'
-                      }, 500)
-                    }
-                  } catch (error) {
-                    showError(error?.response?.data?.error || 'Invalid verification code. Please try again.')
-                  } finally {
-                    setLoading(false)
-                  }
-                }}
+                onComplete={handleVerifyComplete}
                 disabled={loading}
               />
 
               <div className="text-center space-y-3">
                 <button
-                  onClick={() => setStep('form')}
+                  onClick={() => setStep('google_password')}
                   className="mx-auto text-sm text-[#6B7280] dark:text-slate-400 hover:text-[#5B7FFF]"
                   disabled={loading}
                 >
-                  Back to login form
-                </button>
-              </div>
-            </div>
-          ) : (
-            /* Email Verification Step */
-            <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#E8F0FF] dark:bg-slate-700 mb-4"
-                >
-                  <Mail className="h-8 w-8 text-[#5B7FFF]" />
-                </motion.div>
-                <h2 className="text-2xl font-bold text-[#1F2937] dark:text-slate-100">Check your email</h2>
-                <p className="text-sm text-[#6B7280] dark:text-slate-400">
-                  We've sent a 6-digit verification code to
-                  <br />
-                  <span className="font-semibold text-[#1F2937] dark:text-slate-200">{email}</span>
-                </p>
-              </div>
-
-              <VerificationCodeInput
-                length={6}
-                onComplete={async (code) => {
-                  try {
-                    setLoading(true)
-                    await verifyLogin({ email, code })
-                    showSuccess('Logged in successfully!')
-                    navigate(from, { replace: true })
-                  } catch (error) {
-                    showError(error?.message || 'Invalid verification code. Please try again.')
-                  } finally {
-                    setLoading(false)
-                  }
-                }}
-                disabled={loading}
-              />
-
-              <div className="text-center space-y-3">
-                <button
-                  onClick={() => setStep('form')}
-                  className="mx-auto text-sm text-[#6B7280] dark:text-slate-400 hover:text-[#5B7FFF]"
-                  disabled={loading}
-                >
-                  Back to login form
+                  Back to password setup
                 </button>
                 <p className="text-xs text-[#6B7280] dark:text-slate-400">
-                  Didn't receive the code? Check your spam folder or{' '}
-                  <button
-                    onClick={async () => {
-                      try {
-                        setLoading(true)
-                        showError('Please go back and submit the form again to resend the code.')
-                      } catch (error) {
-                        showError('Failed to resend code. Please try again.')
-                      } finally {
-                        setLoading(false)
-                      }
-                    }}
-                    className="text-[#5B7FFF] hover:underline"
-                    disabled={loading}
-                  >
-                    resend
-                  </button>
+                  Didn't receive the code? Check your spam folder.
                 </p>
               </div>
             </div>
           )}
-=======
-              } catch (error) {
-                showError(error?.message || 'Login failed. Please check your credentials and try again.')
-              } finally {
-                setLoading(false)
-              }
-            }}
-            disabled={loading}
-          />
->>>>>>> fd28afaa34a6b3ca12c30b0ca85f5283dd59e554
 
           <p className="text-center text-sm text-[#6B7280] dark:text-slate-400 mt-6">
             New here?{' '}

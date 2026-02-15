@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Trash2, AlertTriangle, User, Mail, Calendar, Shield, LogOut } from 'lucide-react'
+import { Trash2, AlertTriangle, User, Mail, Calendar, Shield, LogOut, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import UICard from '../components/ui/Card'
 import UIButton from '../components/ui/Button'
@@ -15,6 +16,72 @@ export default function Settings() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState('')
+  
+  // OpenAI API Key state
+  const [apiKey, setApiKey] = useState('')
+  const [showKey, setShowKey] = useState(false)
+  const [hasKey, setHasKey] = useState(false)
+  const [loadingKey, setLoadingKey] = useState(false)
+  const [messageKey, setMessageKey] = useState('')
+
+  // Check if user has API key on mount
+  useEffect(() => {
+    checkApiKey()
+  }, [])
+
+  const checkApiKey = async () => {
+    try {
+      const res = await api.get('/api/user/openai-key')
+      setHasKey(res.data.has_key)
+    } catch (err) {
+      console.error('Error checking API key:', err)
+    }
+  }
+
+  const handleSaveKey = async (e) => {
+    e.preventDefault()
+    
+    if (!apiKey.trim()) {
+      setMessageKey('API key cannot be empty')
+      return
+    }
+
+    if (!apiKey.startsWith('sk-')) {
+      setMessageKey('Invalid OpenAI API key format. Must start with "sk-"')
+      return
+    }
+
+    setLoadingKey(true)
+    try {
+      await api.post('/api/user/openai-key', {
+        api_key: apiKey.trim()
+      })
+      setMessageKey('✅ API key saved securely!')
+      setHasKey(true)
+      setApiKey('')
+      setTimeout(() => setMessageKey(''), 3000)
+    } catch (err) {
+      setMessageKey('❌ ' + (err.response?.data?.error || 'Error saving API key'))
+    } finally {
+      setLoadingKey(false)
+    }
+  }
+
+  const handleDeleteKey = async () => {
+    if (!confirm('Remove your OpenAI API key from session?')) return
+
+    setLoadingKey(true)
+    try {
+      await api.delete('/api/user/openai-key')
+      setMessageKey('✅ API key removed')
+      setHasKey(false)
+      setTimeout(() => setMessageKey(''), 3000)
+    } catch (err) {
+      setMessageKey('❌ Error removing API key')
+    } finally {
+      setLoadingKey(false)
+    }
+  }
 
   const handleDeleteAccount = async () => {
     if (deleteConfirmText.toLowerCase() !== 'delete') {
@@ -102,6 +169,88 @@ export default function Settings() {
                   </p>
                 </div>
               </div>
+            </div>
+          </UICard>
+
+          {/* OpenAI API Key Section */}
+          <UICard className="mb-6 p-6">
+            <h2 className="text-xl font-bold text-[#1F2937] mb-4 flex items-center gap-2">
+              <Shield className="h-5 w-5 text-[#6C63FF]" />
+              OpenAI API Key
+            </h2>
+            
+            <p className="text-sm text-[#6B7280] mb-4">
+              Your API key is stored securely in your session and automatically expires after 1 hour of inactivity.
+              <strong> Your key is never saved to the database.</strong>
+            </p>
+
+            {hasKey && (
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-3 mb-4 flex items-center gap-2">
+                <span className="text-green-600 dark:text-green-400">✓</span>
+                <span className="text-sm text-green-700 dark:text-green-300">
+                  API key is configured and ready to use
+                </span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveKey} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#1F2937] mb-2">
+                  OpenAI API Key (sk-...)
+                </label>
+                <div className="relative">
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="sk-..."
+                    className="w-full px-4 py-2 border border-[#E5E7EB] rounded-lg bg-white text-[#1F2937] placeholder-[#9CA3AF] focus:ring-2 focus:ring-[#5B7FFF] focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey(!showKey)}
+                    className="absolute right-3 top-2.5 text-[#6B7280] hover:text-[#1F2937]"
+                  >
+                    {showKey ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+                <p className="text-xs text-[#6B7280] mt-1">
+                  Get your key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-[#5B7FFF] hover:underline">openai.com/api-keys</a>
+                </p>
+              </div>
+
+              {messageKey && (
+                <p className={`text-sm ${messageKey.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
+                  {messageKey}
+                </p>
+              )}
+
+              <div className="flex gap-2">
+                <UIButton
+                  type="submit"
+                  disabled={loadingKey}
+                  className="flex-1"
+                >
+                  {loadingKey ? 'Saving...' : 'Save API Key'}
+                </UIButton>
+                {hasKey && (
+                  <UIButton
+                    type="button"
+                    onClick={handleDeleteKey}
+                    disabled={loadingKey}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    Remove
+                  </UIButton>
+                )}
+              </div>
+            </form>
+
+            {/* Session Info */}
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-xs text-blue-700">
+                <strong>⏱️ Session Expiry:</strong> Your API key session expires after 1 hour of inactivity. You'll need to re-enter your API key after logout.
+              </p>
             </div>
           </UICard>
 

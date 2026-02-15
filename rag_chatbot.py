@@ -23,11 +23,15 @@ CHROMA_DB_DIR = "./chroma_db"
 os.makedirs(CHROMA_DB_DIR, exist_ok=True)
 
 
-def get_embeddings():
-    """Get OpenAI embeddings model"""
-    api_key = Config.OPENAI_API_KEY
+def get_embeddings(api_key=None):
+    """Get OpenAI embeddings model
+    
+    Args:
+        api_key: Optional user-provided OpenAI API key. If not provided, uses Config.OPENAI_API_KEY
+    """
+    api_key = api_key or Config.OPENAI_API_KEY
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set")
+        raise RuntimeError("OPENAI_API_KEY is not set and user did not provide one")
     
     # Use smaller, cheaper embedding model
     return OpenAIEmbeddings(
@@ -36,11 +40,15 @@ def get_embeddings():
     )
 
 
-def get_llm():
-    """Get OpenAI LLM (same as chatbot.py)"""
-    api_key = Config.OPENAI_API_KEY
+def get_llm(api_key=None):
+    """Get OpenAI LLM
+    
+    Args:
+        api_key: Optional user-provided OpenAI API key. If not provided, uses Config.OPENAI_API_KEY
+    """
+    api_key = api_key or Config.OPENAI_API_KEY
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set")
+        raise RuntimeError("OPENAI_API_KEY is not set and user did not provide one")
     
     return ChatOpenAI(
         model="gpt-4o-mini",
@@ -49,7 +57,7 @@ def get_llm():
     )
 
 
-def create_vector_store(chat_data):
+def create_vector_store(chat_data, api_key=None):
     """
     Create vector store from chat messages.
     This is called once when a persona is created.
@@ -103,7 +111,7 @@ def create_vector_store(chat_data):
             raise ValueError(f"No valid messages found for {chat_data.selected_person}. All messages were empty.")
         
         # Create embeddings
-        embeddings = get_embeddings()
+        embeddings = get_embeddings(api_key)
         
         # Create persist directory for this chat
         persist_dir = os.path.join(CHROMA_DB_DIR, f"chat_{chat_data.id}")
@@ -128,7 +136,7 @@ def create_vector_store(chat_data):
         raise
 
 
-def load_vector_store(chat_data_id):
+def load_vector_store(chat_data_id, api_key=None):
     """
     Load existing vector store for a chat.
     
@@ -146,7 +154,7 @@ def load_vector_store(chat_data_id):
             print(f"[RAG] Vector store not found for chat {chat_data_id}")
             return None
         
-        embeddings = get_embeddings()
+        embeddings = get_embeddings(api_key)
         
         vector_store = Chroma(
             persist_directory=persist_dir,
@@ -327,7 +335,7 @@ Additional instructions:
     return prompt
 
 
-def get_chatbot_response_rag(chat_data_id, user_input):
+def get_chatbot_response_rag(chat_data_id, user_input, user_api_key=None):
     """
     Generate chatbot response using RAG (Retrieval-Augmented Generation).
     
@@ -341,6 +349,7 @@ def get_chatbot_response_rag(chat_data_id, user_input):
     Args:
         chat_data_id: ID of the ChatData entry
         user_input: User's message
+        user_api_key: Optional user-provided OpenAI API key from session
         
     Returns:
         str: Chatbot response
@@ -361,10 +370,10 @@ def get_chatbot_response_rag(chat_data_id, user_input):
         print(f"[RAG] Selected person: {selected_person}")
         
         # Load or create vector store
-        vector_store = load_vector_store(chat_data_id)
+        vector_store = load_vector_store(chat_data_id, user_api_key)
         if not vector_store:
             print("[RAG] Vector store not found, creating new one...")
-            vector_store = create_vector_store(chat_data)
+            vector_store = create_vector_store(chat_data, user_api_key)
         
         # Get personality messages (large set for style reference)
         personality_messages = get_personality_messages(chat_data, num_messages=150)
@@ -434,8 +443,8 @@ def get_chatbot_response_rag(chat_data_id, user_input):
         # Create RAG-enhanced prompt with both personality and contextual messages
         prompt = create_rag_prompt(selected_person, personality_messages, contextual_messages, using_fallback=using_fallback)
         
-        # Build the runnable pipeline
-        chain = prompt | get_llm()
+        # Build the runnable pipeline using user's API key if provided
+        chain = prompt | get_llm(user_api_key)
         
         # Wrap with message history
         chain_with_history = RunnableWithMessageHistory(

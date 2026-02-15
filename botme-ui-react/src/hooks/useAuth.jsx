@@ -77,6 +77,25 @@ export function AuthProvider({ children }) {
     }
   }
 
+  const setUserDirect = (userData) => {
+    if (userData) {
+      localStorage.setItem('auth_token', 'session')
+      setUser(userData)
+    }
+  }
+
+  const refreshUser = async () => {
+    try {
+      const { data } = await api.get('/api/me')
+      if (data && data.user) {
+        setUser(data.user)
+        console.log('[AUTH] User refreshed:', data.user)
+      }
+    } catch (error) {
+      console.error('[AUTH] Failed to refresh user:', error)
+    }
+  }
+
   const requestPasswordReset = async (email) => {
     if (!email) throw new Error('Email is required')
     const { data } = await api.post('/api/request-password-reset', { email })
@@ -103,11 +122,12 @@ export function AuthProvider({ children }) {
       user,
       loading,
       login,
-
       signup,
       verifySignup,
       logout,
+      refreshUser,
       oauthLogin,
+      setUserDirect,
       requestPasswordReset,
       resetPassword,
     }),

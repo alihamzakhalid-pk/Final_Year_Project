@@ -209,19 +209,43 @@ export default function Landing() {
               className="rounded-3xl bg-white/90 px-4 py-2.5 shadow-[0_8px_30px_rgba(91,127,255,0.25),0_4px_12px_rgba(124,58,237,0.15)] ring-1 ring-white/80 backdrop-blur-sm"
             />
           </Link>
-          <div className="hidden items-center gap-4 text-sm font-medium text-slate-600 md:flex">
-            <a href="#features" className="rounded-xl px-3 py-2 transition-colors hover:bg-slate-100 hover:text-slate-900">
+          <div className="hidden items-center gap-3 md:flex">
+            <UIButton
+              as="a"
+              href="#features"
+              variant="ghost"
+              size="md"
+              className="rounded-xl px-4 py-2 font-medium text-slate-600 hover:text-slate-900"
+            >
               Features
-            </a>
-            <a href="#how-it-works" className="rounded-xl px-3 py-2 transition-colors hover:bg-slate-100 hover:text-slate-900">
+            </UIButton>
+            <UIButton
+              as="a"
+              href="#how-it-works"
+              variant="ghost"
+              size="md"
+              className="rounded-xl px-4 py-2 font-medium text-slate-600 hover:text-slate-900"
+            >
               How it works
-            </a>
-            <a href="#insights" className="rounded-xl px-3 py-2 transition-colors hover:bg-slate-100 hover:text-slate-900">
+            </UIButton>
+            <UIButton
+              as="a"
+              href="#insights"
+              variant="ghost"
+              size="md"
+              className="rounded-xl px-4 py-2 font-medium text-slate-600 hover:text-slate-900"
+            >
               Insights
-            </a>
-            <Link to="/login" className="rounded-xl px-3 py-2 transition-colors hover:bg-slate-100 hover:text-slate-900">
+            </UIButton>
+            <UIButton
+              as={Link}
+              to="/login"
+              variant="ghost"
+              size="md"
+              className="rounded-xl px-4 py-2 font-medium text-slate-600 hover:text-slate-900"
+            >
               Log in
-            </Link>
+            </UIButton>
             <CTAButton
               variant="ghost"
               className="!shadow-none bg-gradient-to-r from-[#5B7FFF] via-[#6D5DFF] to-[#7C3AED] text-white hover:scale-[1.02]"

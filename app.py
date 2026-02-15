@@ -43,6 +43,23 @@ app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
 
+# Check OpenAI Key status
+if app.config.get('OPENAI_API_KEY'):
+    print(f"[STARTUP] OpenAI API Key is configured: {app.config['OPENAI_API_KEY'][:8]}...")
+else:
+    print("[STARTUP] WARNING: OpenAI API Key is NOT configured in .env")
+
+
+# Session configuration for secure API key storage
+# In production, SESSION_COOKIE_SECURE should be True (HTTPS only)
+# In development, it must be False to work with HTTP
+is_production = os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER') is not None
+app.config['SESSION_COOKIE_SECURE'] = is_production  # HTTPS only in production
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # No JavaScript access
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)  # 1 hour expiry
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Reset timer on each request
+
 # Enable CORS for SPA
 # IMPORTANT: When supports_credentials=True, origins cannot be "*"
 # Must use explicit origins
@@ -283,6 +300,9 @@ def api_health():
 @app.route('/api/me', methods=['GET'])
 def api_me():
     if current_user.is_authenticated:
+        # Refresh user data from database to ensure we have latest is_admin status
+        db.session.refresh(current_user)
+        print(f"[API-ME] User {current_user.username} - is_admin: {current_user.is_admin}")
         return jsonify({
             'authenticated': True,
             'user': serialize_user(current_user)
@@ -500,6 +520,194 @@ def oauth_callback(provider):
     return redirect(f"{frontend_url}/dashboard")
 
 
+# ==========================================
+# GOOGLE OAUTH - ID TOKEN FLOW (for @react-oauth/google)
+# ==========================================
+
+@app.route('/api/oauth/google/id-token', methods=['POST'])
+def api_google_id_token():
+    """Verify Google ID token from @react-oauth/google popup.
+    
+    - If user exists: log them in and return { new_user: false, user: {...} }
+    - If new user: send verification code, return { new_user: true, email, name }
+    """
+    data = request.json or {}
+    token = data.get('token')
+    
+    if not token:
+        return jsonify({'error': 'Missing Google ID token'}), 400
+    
+    # Verify the Google ID token
+    try:
+        client_id = app.config.get('GOOGLE_CLIENT_ID')
+        if not client_id:
+            return jsonify({'error': 'Google OAuth not configured on server'}), 500
+        
+        idinfo = id_token.verify_oauth2_token(
+            token,
+            google_requests.Request(),
+            client_id
+        )
+        
+        google_email = idinfo.get('email', '').strip().lower()
+        google_name = idinfo.get('name', '')
+        google_id = idinfo.get('sub', '')  # Google's unique user ID
+        
+        if not google_email:
+            return jsonify({'error': 'No email found in Google account'}), 400
+        
+    except ValueError as e:
+        print(f"[GOOGLE-ID-TOKEN] Token verification failed: {e}")
+        return jsonify({'error': 'Invalid Google token. Please try again.'}), 401
+    except Exception as e:
+        print(f"[GOOGLE-ID-TOKEN] Unexpected error verifying token: {e}")
+        return jsonify({'error': 'Failed to verify Google token'}), 500
+    
+    # Check if user already exists (by oauth_id OR by email)
+    user = User.query.filter_by(oauth_provider='google', oauth_id=str(google_id)).first()
+    if not user:
+        user = User.query.filter_by(email=google_email).first()
+    
+    if user:
+        # ---- EXISTING USER: log in directly ----
+        if not user.oauth_provider:
+            # Link Google to existing email account
+            user.oauth_provider = 'google'
+            user.oauth_id = str(google_id)
+            db.session.commit()
+        
+        login_user(user)
+        user.last_login = datetime.utcnow()
+        db.session.commit()
+        
+        print(f"[GOOGLE-ID-TOKEN] Existing user logged in: {user.email}")
+        return jsonify({
+            'new_user': False,
+            'message': 'Logged in successfully',
+            'user': serialize_user(user),
+            'token': 'session'
+        }), 200
+    
+    # ---- NEW USER: send verification code ----
+    # Delete any existing verification codes for this email
+    VerificationCode.query.filter_by(email=google_email, purpose='signup').delete()
+    
+    code = generate_verification_code()
+    expires_at = datetime.utcnow() + timedelta(minutes=10)
+    
+    # Store Google info in temp_data so we can create the user later
+    temp_data = json.dumps({
+        'fullName': google_name,
+        'email': google_email,
+        'google_id': google_id,
+        'oauth_provider': 'google'
+    })
+    
+    verification = VerificationCode(
+        email=google_email,
+        code=code,
+        purpose='signup',
+        expires_at=expires_at,
+        temp_data=temp_data
+    )
+    db.session.add(verification)
+    db.session.commit()
+    
+    # Try to send verification email
+    email_sent = send_verification_email(google_email, code, 'signup')
+    
+    response_data = {
+        'new_user': True,
+        'email': google_email,
+        'name': google_name,
+        'message': 'Verification code sent to your email'
+    }
+    
+    if not email_sent:
+        if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
+            # Dev mode: return code directly
+            print(f"[GOOGLE-ID-TOKEN] Dev mode - code for {google_email}: {code}")
+            response_data['code'] = code
+            response_data['devMode'] = True
+        else:
+            return jsonify({'error': 'Failed to send verification email'}), 500
+    
+    print(f"[GOOGLE-ID-TOKEN] New user, verification code sent to {google_email}")
+    return jsonify(response_data), 200
+
+
+@app.route('/api/oauth/google/complete-signup', methods=['POST'])
+def api_google_complete_signup():
+    """Complete signup for a new Google OAuth user.
+    
+    Receives email, verification code, and password.
+    Creates the user account with both Google OAuth and password.
+    """
+    data = request.json or {}
+    email = (data.get('email') or '').strip().lower()
+    code = (data.get('code') or '').strip()
+    password = data.get('password')
+    
+    if not email or not code:
+        return jsonify({'error': 'Missing email or verification code'}), 400
+    
+    if not password or len(password) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters'}), 400
+    
+    # Find verification code
+    verification = VerificationCode.query.filter_by(
+        email=email,
+        code=code,
+        purpose='signup'
+    ).first()
+    
+    if not verification:
+        return jsonify({'error': 'Invalid verification code'}), 400
+    
+    if verification.is_expired():
+        db.session.delete(verification)
+        db.session.commit()
+        return jsonify({'error': 'Verification code has expired. Please try again.'}), 400
+    
+    # Load Google info from temp_data
+    temp_data = json.loads(verification.temp_data or '{}')
+    full_name = temp_data.get('fullName', '')
+    google_id = temp_data.get('google_id', '')
+    
+    # Double-check user doesn't already exist
+    if User.query.filter_by(email=email).first():
+        db.session.delete(verification)
+        db.session.commit()
+        return jsonify({'error': 'An account with this email already exists. Please log in instead.'}), 409
+    
+    # Create user with both Google OAuth and password
+    username = generate_username(full_name or email.split('@')[0])
+    user = User(
+        username=username,
+        email=email,
+        full_name=full_name,
+        oauth_provider='google',
+        oauth_id=str(google_id) if google_id else None
+    )
+    user.set_password(password)
+    db.session.add(user)
+    
+    # Delete verification code
+    db.session.delete(verification)
+    db.session.commit()
+    
+    # Login user
+    login_user(user)
+    user.last_login = datetime.utcnow()
+    db.session.commit()
+    
+    print(f"[GOOGLE-COMPLETE-SIGNUP] New user created: {email} (username: {username})")
+    
+    return jsonify({
+        'message': 'Account created successfully',
+        'user': serialize_user(user),
+        'token': 'session'
+    }), 201
 
 
 
@@ -693,8 +901,15 @@ def api_select_person():
     
     # ===== RAG: CREATE VECTOR STORE =====
     try:
+        # Get user's OpenAI API key from session (if they provided one)
+        user_openai_key = session.get('openai_api_key')
+        if not user_openai_key:
+             print(f"[SELECT_PERSON] No user API key found in session, using .env key")
+        else:
+             print(f"[SELECT_PERSON] Using user-provided OpenAI API key")
+             
         print(f"[SELECT_PERSON] Creating RAG vector store for chat {chat_id}...")
-        create_vector_store(temp_chat)
+        create_vector_store(temp_chat, user_openai_key)
         print(f"[SELECT_PERSON] ✅ RAG vector store created successfully")
     except Exception as e:
         print(f"[SELECT_PERSON] ⚠️ Warning: Failed to create RAG vector store: {e}")
@@ -862,8 +1077,17 @@ def api_chat_rag(chat_id):
         return jsonify({'error': 'No persona selected for this chat. Please go back and select a persona.'}), 400
     
     try:
+        # Get user's OpenAI API key from session (if they provided one)
+        user_openai_key = session.get('openai_api_key')
+        
+        if not user_openai_key:
+            # Fallback to environment variable
+            print(f"[API] No user API key found in session for user {current_user.id}, using .env key")
+        else:
+            print(f"[API] Using user-provided OpenAI API key for user {current_user.id}")
+        
         print(f"\n[API] RAG SYSTEM endpoint called for chat {chat_id}")
-        response = get_chatbot_response_rag(chat_id, user_input)
+        response = get_chatbot_response_rag(chat_id, user_input, user_openai_key)
         return jsonify({'response': response, 'source': 'rag'})
     except Exception as e:
         import traceback
@@ -1080,17 +1304,28 @@ def api_personality_analysis(chat_id):
         print(f"[PERSONALITY] ====== END ERROR ======")
         return jsonify({'error': f'Failed to analyze personality: {str(e)}'}), 500
 
-<<<<<<< HEAD
+
 # ==================== JWT-BASED GOOGLE OAUTH ENDPOINT ====================
 
 @app.route('/api/oauth/google/callback', methods=['POST'])
 def google_callback():
     """Handle Google OAuth with JWT token verification - sends verification code"""
     try:
+        # If user is already logged in, just redirect to dashboard
+        print(f"[OAUTH-JWT] current_user.is_authenticated: {current_user.is_authenticated}")
+        if current_user.is_authenticated:
+            print(f"[OAUTH-JWT] User {current_user.username} already authenticated. Returning new_user=false")
+            return jsonify({
+                'message': 'Already logged in',
+                'user': serialize_user(current_user),
+                'new_user': False
+            }), 200
+        
         data = request.get_json() or {}
         token = data.get('token')
         
         if not token:
+            print("[OAUTH-JWT] Error: Missing token")
             return jsonify({'error': 'Missing token'}), 400
         
         print(f"[OAUTH-JWT] Verifying Google token...")
@@ -1167,7 +1402,9 @@ def google_callback():
                     return jsonify({
                         'message': 'Verification code sent to your email',
                         'email': email,
-                        'requiresVerification': True
+                        'name': name,
+                        'code': code,
+                        'new_user': True
                     }), 200
                 else:
                     # Email failed
@@ -1176,9 +1413,10 @@ def google_callback():
                         return jsonify({
                             'message': 'Dev mode: Email not configured. Use code below to verify.',
                             'email': email,
+                            'name': name,
                             'code': code,
                             'devMode': True,
-                            'requiresVerification': True
+                            'new_user': True
                         }), 200
                     else:
                         return jsonify({
@@ -1193,7 +1431,7 @@ def google_callback():
                 'message': 'Login successful',
                 'user': serialize_user(user),
                 'token': 'session',
-                'requiresVerification': False
+                'new_user': False
             }), 200
             
         except ValueError as e:
@@ -1240,6 +1478,9 @@ def oauth_verify_signup():
     oauth_provider = temp_data.get('oauth_provider', 'google')
     oauth_id = temp_data.get('oauth_id')
     
+    # Get optional password from request
+    password = request.json.get('password') if request.json else None
+    
     # Generate username
     username = generate_username(name or email.split('@')[0])
     
@@ -1252,6 +1493,14 @@ def oauth_verify_signup():
         oauth_id=oauth_id,
         is_active=True
     )
+    
+    # Set password if provided (optional for OAuth users)
+    if password:
+        user.set_password(password)
+        print(f"[OAUTH-JWT] Password set for new OAuth user: {email}")
+    else:
+        print(f"[OAUTH-JWT] No password set - OAuth-only account: {email}")
+    
     db.session.add(user)
     
     # Delete verification code
@@ -1269,28 +1518,49 @@ def oauth_verify_signup():
     }), 201
 
 
-# Legacy endpoint (deprecated)
-@app.route('/api/oauth/<provider>', methods=['GET', 'OPTIONS'])
-def oauth_login(provider):
-    """[DEPRECATED] Use GoogleLogin popup component instead"""
-=======
+# ==================== USER API KEY ENDPOINTS ====================
 
-
-# Apple Sign In (special handling - requires frontend SDK)
-@app.route('/api/oauth/apple', methods=['POST'])
-def apple_oauth():
-    """Handle Apple Sign In (uses different flow with JWT)"""
+@app.route('/api/user/openai-key', methods=['POST'])
+@login_required
+def set_openai_key():
+    """Store user's OpenAI API key in session (expires after 1 hour)"""
     data = request.json or {}
-    # Apple Sign In requires JWT verification
-    # For now, return a message that it needs proper JWT verification
-    # In production, you should verify the JWT token from Apple using their public keys
->>>>>>> fd28afaa34a6b3ca12c30b0ca85f5283dd59e554
-    return jsonify({
-        'error': 'Old OAuth flow is deprecated',
-        'message': 'Use GoogleLogin popup component - POST JWT token to /api/oauth/google/callback'
-    }), 400
+    api_key = data.get('api_key', '').strip()
+    
+    if not api_key:
+        print("[API_KEY] Error: API key required")
+        return jsonify({'error': 'API key required'}), 400
+    
+    # Basic validation (just length check)
+    if len(api_key) < 20:
+        print(f"[API_KEY] Warning: Short API key provided: {len(api_key)} chars")
+        # Proceed anyway - let OpenAI reject it if invalid
+    
+    # Store in server session (not database, not client-side)
+    session['openai_api_key'] = api_key
+    session.permanent = True
+    session.modified = True  # Force Flask to save the session
+    print(f"[API_KEY] API key saved to session for user {current_user.username}")
+    
+    return jsonify({'message': 'API key stored securely in session'}), 200
 
 
+@app.route('/api/user/openai-key', methods=['GET'])
+@login_required
+def check_openai_key():
+    """Check if user has API key in session"""
+    has_key = 'openai_api_key' in session
+    return jsonify({'has_key': has_key}), 200
+
+
+@app.route('/api/user/openai-key', methods=['DELETE'])
+@login_required
+def delete_openai_key():
+    """Clear API key from session"""
+    session.pop('openai_api_key', None)
+    return jsonify({'message': 'API key removed from session'}), 200
+
+# ============================================================
 
 
 # ==================== ADMIN API ENDPOINTS ====================
@@ -1476,8 +1746,17 @@ def admin_delete_user(user_id):
 @login_required
 def admin_check():
     """Check if current user is admin"""
+    # Re-query user from database to get latest is_admin status
+    user = User.query.get(current_user.id)
+    if not user:
+        print(f"[ADMIN-CHECK] User {current_user.id} not found in database")
+        return jsonify({'is_admin': False}), 401
+    
+    is_admin = getattr(user, 'is_admin', False)
+    print(f"[ADMIN-CHECK] User {user.username} (ID: {user.id}) - is_admin: {is_admin}")
     return jsonify({
-        'is_admin': getattr(current_user, 'is_admin', False)
+        'is_admin': is_admin,
+        'user': serialize_user(user)
     })
 
 if __name__ == '__main__':

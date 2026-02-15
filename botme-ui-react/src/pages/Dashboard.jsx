@@ -213,20 +213,20 @@ export default function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.4 }}
         >
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[#1F2937] dark:text-slate-100">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <h2 className="text-lg font-semibold text-[#1F2937] dark:text-slate-100 whitespace-nowrap">
               Your Personas {personas.length > 0 && `(${personas.length})`}
             </h2>
-            {personas.length > 0 && (
-              <div className="w-64">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="flex-1">
                 <SearchInput
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search personas..."
-                  className="w-full"
+                  className="w-full max-w-md"
                 />
               </div>
-            )}
+            </div>
           </div>
 
           {/* Personas List */}

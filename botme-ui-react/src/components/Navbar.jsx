@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, Search, Settings, User, LogOut, ChevronDown, Menu, X } from 'lucide-react'
+import { Search, Settings, User, LogOut, ChevronDown, Menu, X, Key } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
 import { useAuth } from '../hooks/useAuth'
 import Avatar from './Avatar'
@@ -9,6 +9,8 @@ import Badge from './ui/Badge'
 import SearchInput from './ui/SearchInput'
 import Modal from './ui/Modal'
 import Logo from './Logo'
+import ApiKeyModal from './ApiKeyModal'
+import UIButton from './ui/Button'
 
 const navLinks = [
   { to: '/', label: 'Home', authOnly: false },
@@ -19,16 +21,23 @@ const navLinks = [
 ]
 
 export default function Navbar() {
-  const { user, logout } = useAuth() || {}
+  const { user, logout, refreshUser } = useAuth() || {}
   const [mobileOpen, setMobileOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false)
   const menuRef = useRef(null)
-  const notificationRef = useRef(null)
   const location = useLocation()
   const navigate = useNavigate()
-  const notificationCount = 3 // Mock notification count
+
+  // Refresh user data when menu opens to show latest admin status
+  const handleMenuOpen = async () => {
+    setMenuOpen(true)
+    if (refreshUser && user) {
+      await refreshUser()
+    }
+  }
+
 
   useEffect(() => {
     setMobileOpen(false)
@@ -39,9 +48,6 @@ export default function Navbar() {
     const handleClick = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setMenuOpen(false)
-      }
-      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
-        setNotificationsOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClick)
@@ -114,12 +120,23 @@ export default function Navbar() {
 
           {/* Search Bar - Center */}
           {user && (
-            <div className="hidden flex-1 items-center justify-center px-8 lg:flex">
+            <div className="hidden flex-1 items-center justify-center gap-4 px-8 lg:flex">
+              {/* API Key Button */}
+              <UIButton
+                variant="outline"
+                size="md"
+                onClick={() => setApiKeyModalOpen(true)}
+                className="flex items-center gap-2 rounded-lg border-slate-300 dark:border-slate-600 px-3 py-1.5 font-medium text-[#6B7280] dark:text-slate-300 hover:border-[#5B7FFF] hover:text-[#5B7FFF] dark:hover:border-[#5B7FFF] dark:hover:text-[#5B7FFF] whitespace-nowrap"
+              >
+                <Key className="h-4 w-4" />
+                API Key
+              </UIButton>
+
               <SearchInput
                 value=""
                 onChange={() => { }}
                 placeholder="Search..."
-                className="w-[400px]"
+                className="w-[300px]"
                 onClick={() => setSearchOpen(true)}
               />
             </div>
@@ -129,74 +146,28 @@ export default function Navbar() {
             {user && (
               <>
                 {/* Search Button - Mobile */}
-                <button
-                  type="button"
+                <UIButton
+                  variant="outline"
+                  size="md"
                   onClick={() => setSearchOpen(true)}
-                  className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-[#6B7280] dark:text-slate-300 transition-all hover:border-primary-300 hover:text-primary md:hidden"
+                  className="flex items-center gap-2 rounded-lg border-slate-200 dark:border-slate-700 px-3 py-1.5 text-[#6B7280] dark:text-slate-300 md:hidden"
                 >
                   <Search className="h-4 w-4" />
-                </button>
+                </UIButton>
 
-                {/* Notifications */}
-                <div ref={notificationRef} className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setNotificationsOpen(!notificationsOpen)}
-                    className="relative rounded-lg p-2 text-[#6B7280] dark:text-slate-300 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-primary focus:visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                    aria-label="Notifications"
-                  >
-                    <Bell className="h-5 w-5" />
-                    {notificationCount > 0 && (
-                      <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#5B7FFF] text-xs font-bold text-white">
-                        {notificationCount > 9 ? '9+' : notificationCount}
-                      </span>
-                    )}
-                  </button>
-                  {notificationsOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="absolute right-0 mt-2 w-80 rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
-                    >
-                      <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Notifications</h3>
-                      </div>
-                      <div className="max-h-96 overflow-y-auto p-2">
-                        <div className="rounded-lg p-3 text-sm text-slate-500 dark:text-slate-400">
-                          No new notifications
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {!user ? (
-              <div className="hidden items-center gap-2 md:flex">
-                <button
-                  type="button"
-                  onClick={() => navigate('/login')}
-                  className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm font-medium text-[#1F2937] dark:text-slate-200 transition hover:border-[#5B7FFF] hover:text-[#5B7FFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B7FFF]/50"
-                >
-                  Login
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/signup')}
-                  className="rounded-xl bg-[#5B7FFF] px-6 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#4A6AD9] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B7FFF]/60"
-                >
-                  Try Free
-                </button>
-              </div>
-            ) : (
-              <div ref={menuRef} className="relative">
+                {/* Settings */}
                 <button
                   type="button"
                   className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-[#1F2937] dark:text-slate-200 transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                   aria-expanded={menuOpen}
                   aria-haspopup="menu"
-                  onClick={() => setMenuOpen((prev) => !prev)}
+                  onClick={() => {
+                    const newState = !menuOpen
+                    setMenuOpen(newState)
+                    if (newState && refreshUser && user) {
+                      refreshUser()
+                    }
+                  }}
                 >
                   <Avatar name={user?.fullName || user?.username || 'User'} size={32} />
                   <span className="hidden max-w-[120px] truncate text-sm font-medium md:block text-[#1F2937] dark:text-slate-200">
@@ -277,19 +248,20 @@ export default function Navbar() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </div>
+              </>
             )}
 
             <ThemeToggle />
 
-            <button
-              type="button"
-              className="inline-flex items-center justify-center rounded-lg border border-transparent p-2 text-[#6B7280] dark:text-slate-300 transition hover:text-[#5B7FFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B7FFF]/50 md:hidden"
+            <UIButton
+              variant="ghost"
+              size="md"
               onClick={() => setMobileOpen((prev) => !prev)}
+              className="rounded-lg p-2 md:hidden"
               aria-label="Toggle navigation"
             >
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
+            </UIButton>
           </div>
         </div>
 
@@ -321,26 +293,36 @@ export default function Navbar() {
 
               {!user && (
                 <div className="mt-4 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => navigate('/login')}
-                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-center font-semibold text-slate-700 hover:border-primary/40 hover:text-primary-600 dark:border-slate-700 dark:text-slate-200"
+                  <UIButton
+                    as={Link}
+                    to="/login"
+                    variant="outline"
+                    size="md"
+                    className="flex-1 rounded-lg"
                   >
                     Login
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/signup')}
-                    className="flex-1 rounded-lg bg-primary-600 px-3 py-2 text-center font-semibold text-white"
+                  </UIButton>
+                  <UIButton
+                    as={Link}
+                    to="/signup"
+                    variant="primary"
+                    size="md"
+                    className="flex-1 rounded-lg"
                   >
                     Sign Up
-                  </button>
+                  </UIButton>
                 </div>
               )}
             </nav>
           </motion.div>
         )}
       </header>
+
+      {/* API Key Modal */}
+      <ApiKeyModal 
+        isOpen={apiKeyModalOpen} 
+        onClose={() => setApiKeyModalOpen(false)} 
+      />
 
       {/* Search Modal */}
       <Modal

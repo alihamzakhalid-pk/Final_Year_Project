@@ -24,26 +24,42 @@ export default function Admin() {
     const [totalPages, setTotalPages] = useState(1)
     const [actionLoading, setActionLoading] = useState(null)
 
+    const checkAdmin = async () => {
+        setLoading(true)
+        try {
+            console.log('[ADMIN] Checking admin access...')
+            const response = await api.get('/api/admin/check')
+            console.log('[ADMIN] Response:', {
+                is_admin: response.data?.is_admin,
+                user: response.data?.user?.email
+            })
+            
+            if (response.data?.is_admin) {
+                console.log('[ADMIN] Admin access granted')
+                setIsAdmin(true)
+                showSuccess('Admin access granted!')
+                fetchStats()
+                fetchUsers()
+            } else {
+                console.log('[ADMIN] Not admin - user is_admin:', response.data?.is_admin)
+                setIsAdmin(false)
+                // Don't redirect immediately - show access denied page with refresh button
+            }
+        } catch (error) {
+            console.error('[ADMIN] Access check error:', {
+                status: error?.status,
+                message: error?.message,
+                data: error?.data
+            })
+            setIsAdmin(false)
+            // Show access denied page instead of immediate redirect
+        } finally {
+            setLoading(false)
+        }
+    }
+
     // Check admin access
     useEffect(() => {
-        const checkAdmin = async () => {
-            try {
-                const response = await api.get('/api/admin/check')
-                if (response.data?.is_admin) {
-                    setIsAdmin(true)
-                    fetchStats()
-                    fetchUsers()
-                } else {
-                    showError('Admin access required')
-                    navigate('/dashboard')
-                }
-            } catch (error) {
-                showError('Access denied')
-                navigate('/dashboard')
-            } finally {
-                setLoading(false)
-            }
-        }
         checkAdmin()
     }, [])
 
@@ -129,7 +145,51 @@ export default function Admin() {
         )
     }
 
-    if (!isAdmin) return null
+    if (!isAdmin) {
+        return (
+            <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-900 flex items-center justify-center p-4">
+                <UICard className="max-w-md w-full p-8 text-center bg-white dark:bg-slate-800">
+                    <Shield className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Access Denied</h1>
+                    <p className="text-slate-600 dark:text-slate-400 mb-6">
+                        You don't have admin access. If you were just made admin, use the buttons below.
+                    </p>
+                    <div className="space-y-3 text-sm text-left bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6 border border-blue-200 dark:border-blue-800">
+                        <p className="text-blue-900 dark:text-blue-100 text-center">
+                            ✅ 1. Admin made via <code className="bg-blue-100 dark:bg-blue-800 px-2 py-0.5 rounded">make_admin.py</code>
+                        </p>
+                        <p className="text-blue-900 dark:text-blue-100 text-center">
+                            👇 2. Click "Retry" below to check updated status
+                        </p>
+                        <p className="text-blue-900 dark:text-blue-100 text-center">
+                            🎉 3. Admin Panel will appear once verified
+                        </p>
+                    </div>
+                    <UIButton
+                        onClick={() => checkAdmin()}
+                        disabled={loading}
+                        className="w-full mb-3 bg-primary text-white"
+                    >
+                        {loading ? 'Checking...' : 'Retry - Check Admin Status'}
+                    </UIButton>
+                    <UIButton
+                        onClick={() => window.location.reload()}
+                        variant="outline"
+                        className="w-full mb-3"
+                    >
+                        Full Page Refresh
+                    </UIButton>
+                    <UIButton
+                        onClick={() => navigate('/dashboard')}
+                        variant="outline"
+                        className="w-full"
+                    >
+                        Go to Dashboard
+                    </UIButton>
+                </UICard>
+            </div>
+        )
+    }
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-900 transition-colors duration-300">
