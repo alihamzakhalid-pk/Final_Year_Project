@@ -1759,6 +1759,51 @@ def admin_check():
         'user': serialize_user(user)
     })
 
+@app.route('/api/debug/test-email/<email>', methods=['GET'])
+def debug_test_email(email):
+    """Debug endpoint to test email configuration"""
+    try:
+        # Check config variables explicitly
+        config_check = {
+            'MAIL_SERVER': app.config.get('MAIL_SERVER'),
+            'MAIL_PORT': app.config.get('MAIL_PORT'),
+            'MAIL_USERNAME': app.config.get('MAIL_USERNAME'),
+            'MAIL_PASSWORD': 'SET' if app.config.get('MAIL_PASSWORD') else 'NOT SET',
+            'MAIL_USE_TLS': app.config.get('MAIL_USE_TLS')
+        }
+        
+        if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
+            return jsonify({
+                'error': 'Mail credentials not configured',
+                'config': config_check
+            }), 500
+
+        msg = Message(
+            subject="BotMe Debug Email",
+            recipients=[email],
+            body=f"This is a test email from your BotMe deployment.\n\nConfiguration:\n{json.dumps(config_check, indent=2)}"
+        )
+        
+        # Send SYNCHRONOUSLY to catch errors
+        print(f"[DEBUG EMAIL] Attempting to send to {email}...")
+        mail.send(msg)
+        print(f"[DEBUG EMAIL] Sent successfully to {email}")
+        
+        return jsonify({
+            'message': 'Email sent successfully',
+            'config': config_check
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"[DEBUG EMAIL] Failed: {str(e)}")
+        return jsonify({
+            'error': str(e),
+            'traceback': error_trace,
+            'config': config_check
+        }), 500
+
 if __name__ == '__main__':
     # Bind explicitly to 127.0.0.1:5000 to match Vite proxy default
     app.run(host='127.0.0.1', port=5000, debug=True)
