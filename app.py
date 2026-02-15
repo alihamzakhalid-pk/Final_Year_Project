@@ -16,6 +16,8 @@ from parse_chat import parse_chat_file
 from personality_analysis import analyze_personality
 from datetime import datetime, timedelta
 from oauth_handler import get_oauth_auth_url, exchange_oauth_code, get_or_create_oauth_user
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
 from rag_chatbot import (
     get_chatbot_response_rag,  # NEW RAG SYSTEM
@@ -114,6 +116,10 @@ BotMe Team
         mail.send(msg)
         print(f"[EMAIL] Successfully sent verification code to {email}")
         return True
+    except TimeoutError as e:
+        print(f"[EMAIL ERROR] Email send timeout: {str(e)}")
+        print("[EMAIL] Consider: Check network connectivity, verify SMTP server is accessible, or increase timeout")
+        return False
     except Exception as e:
         print(f"[EMAIL ERROR] Failed to send email: {type(e).__name__}: {str(e)}")
         import traceback
@@ -262,7 +268,11 @@ def api_me():
 
 @app.route('/api/signup', methods=['POST'])
 def api_signup():
-    """Send verification code for signup"""
+    """Send verification code for signup
+    
+    In production: Requires email delivery
+    In dev mode (MAIL not configured): Returns code directly for testing
+    """
     data = request.json or {}
     full_name = (data.get('fullName') or data.get('username') or '').strip()
     email = (data.get('email') or '').strip().lower()
@@ -300,14 +310,31 @@ def api_signup():
     db.session.add(verification)
     db.session.commit()
     
-    # Send email
-    if send_verification_email(email, code, 'signup'):
+    # Try to send email
+    email_sent = send_verification_email(email, code, 'signup')
+    
+    if email_sent:
+        # Success: Email was sent
         return jsonify({
             'message': 'Verification code sent to your email',
             'email': email
         }), 200
     else:
-        return jsonify({'error': 'Failed to send verification email. Please check your email configuration.'}), 500
+        # Email failed: Check if we're in dev mode
+        if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
+            # Dev mode: Allow signup to continue without email
+            print(f"[DEV MODE] Email not configured. Returning verification code directly for {email}")
+            return jsonify({
+                'message': 'Dev mode: Email not configured. Use code below to verify.',
+                'email': email,
+                'code': code,  # Return code for dev/testing
+                'devMode': True
+            }), 200
+        else:
+            # Prod mode with email configured but send failed
+            return jsonify({
+                'error': 'Failed to send verification email. Please check your email configuration.'
+            }), 500
 
 
 @app.route('/api/verify-signup', methods=['POST'])
@@ -1020,100 +1047,204 @@ def api_personality_analysis(chat_id):
         print(f"[PERSONALITY] ====== END ERROR ======")
         return jsonify({'error': f'Failed to analyze personality: {str(e)}'}), 500
 
-# OAuth Endpoints
+# ==================== JWT-BASED GOOGLE OAUTH ENDPOINT ====================
+
+@app.route('/api/oauth/google/callback', methods=['POST'])
+def google_callback():
+    """Handle Google OAuth with JWT token verification - sends verification code"""
+    try:
+        data = request.get_json() or {}
+        token = data.get('token')
+        
+        if not token:
+            return jsonify({'error': 'Missing token'}), 400
+        
+        print(f"[OAUTH-JWT] Verifying Google token...")
+        
+        # Get Google Client ID from environment
+        google_client_id = os.environ.get('GOOGLE_CLIENT_ID')
+        if not google_client_id:
+            print("[OAUTH-JWT] ERROR: GOOGLE_CLIENT_ID not configured")
+            return jsonify({'error': 'Google OAuth not configured on server'}), 500
+        
+        try:
+            # Verify the JWT token
+            idinfo = id_token.verify_oauth2_token(
+                token,
+                google_requests.Request(),
+                google_client_id
+            )
+            
+            print(f"[OAUTH-JWT] Token verified for {idinfo.get('email')}")
+            
+            # Extract user info
+            email = idinfo.get('email')
+            name = idinfo.get('name')
+            google_id = idinfo.get('sub')
+            
+            if not email:
+                return jsonify({'error': 'No email in token'}), 400
+            
+            # Check if user exists
+            user = User.query.filter_by(email=email).first()
+            
+            if user:
+                # Existing user - update OAuth info if not set
+                if not user.oauth_provider:
+                    user.oauth_provider = 'google'
+                    user.oauth_id = google_id
+                    db.session.commit()
+                print(f"[OAUTH-JWT] Existing user found: {email}")
+            else:
+                # New user - store temp data and send verification code
+                print(f"[OAUTH-JWT] New user signup via Google: {email}")
+                
+                # Delete any existing verification codes for this email
+                VerificationCode.query.filter_by(email=email, purpose='oauth_signup').delete()
+                
+                # Generate verification code
+                code = generate_verification_code()
+                expires_at = datetime.utcnow() + timedelta(minutes=10)
+                
+                # Store temporary user data (will be used after verification)
+                temp_data = json.dumps({
+                    'email': email,
+                    'fullName': name,
+                    'oauth_provider': 'google',
+                    'oauth_id': google_id
+                })
+                
+                # Save verification code
+                verification = VerificationCode(
+                    email=email,
+                    code=code,
+                    purpose='oauth_signup',
+                    expires_at=expires_at,
+                    temp_data=temp_data
+                )
+                db.session.add(verification)
+                db.session.commit()
+                
+                # Send verification email
+                email_sent = send_verification_email(email, code, 'signup')
+                
+                if email_sent:
+                    print(f"[OAUTH-JWT] Verification code sent to {email}")
+                    return jsonify({
+                        'message': 'Verification code sent to your email',
+                        'email': email,
+                        'requiresVerification': True
+                    }), 200
+                else:
+                    # Email failed
+                    if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
+                        print(f"[DEV MODE] Email not configured. Returning verification code directly")
+                        return jsonify({
+                            'message': 'Dev mode: Email not configured. Use code below to verify.',
+                            'email': email,
+                            'code': code,
+                            'devMode': True,
+                            'requiresVerification': True
+                        }), 200
+                    else:
+                        return jsonify({
+                            'error': 'Failed to send verification email. Please try again.'
+                        }), 500
+            
+            # Existing user - login immediately
+            login_user(user)
+            print(f"[OAUTH-JWT] Existing user logged in: {email}")
+            
+            return jsonify({
+                'message': 'Login successful',
+                'user': serialize_user(user),
+                'token': 'session',
+                'requiresVerification': False
+            }), 200
+            
+        except ValueError as e:
+            print(f"[OAUTH-JWT] Token verification failed: {str(e)}")
+            return jsonify({'error': f'Invalid token: {str(e)}'}), 400
+            
+    except Exception as e:
+        print(f"[OAUTH-JWT] Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Authentication failed: {str(e)}'}), 500
+
+
+@app.route('/api/oauth/verify-signup', methods=['POST'])
+def oauth_verify_signup():
+    """Verify Google OAuth signup code and create account"""
+    data = request.json or {}
+    email = (data.get('email') or '').strip().lower()
+    code = data.get('code', '').strip()
+    
+    if not email or not code:
+        return jsonify({'error': 'Missing email or verification code'}), 400
+    
+    print(f"[OAUTH-JWT] Verifying signup code for {email}")
+    
+    # Find verification code
+    verification = VerificationCode.query.filter_by(
+        email=email, 
+        code=code, 
+        purpose='oauth_signup'
+    ).first()
+    
+    if not verification:
+        return jsonify({'error': 'Invalid verification code'}), 400
+    
+    if verification.is_expired():
+        db.session.delete(verification)
+        db.session.commit()
+        return jsonify({'error': 'Verification code has expired. Please sign up again.'}), 400
+    
+    # Load temporary data
+    temp_data = json.loads(verification.temp_data or '{}')
+    name = temp_data.get('fullName', '')
+    oauth_provider = temp_data.get('oauth_provider', 'google')
+    oauth_id = temp_data.get('oauth_id')
+    
+    # Generate username
+    username = generate_username(name or email.split('@')[0])
+    
+    # Create user
+    user = User(
+        username=username,
+        email=email,
+        full_name=name,
+        oauth_provider=oauth_provider,
+        oauth_id=oauth_id,
+        is_active=True
+    )
+    db.session.add(user)
+    
+    # Delete verification code
+    db.session.delete(verification)
+    db.session.commit()
+    
+    # Login user
+    login_user(user)
+    print(f"[OAUTH-JWT] User created and logged in: {email}")
+    
+    return jsonify({
+        'message': 'Account created successfully',
+        'user': serialize_user(user),
+        'token': 'session'
+    }), 201
+
+
+# Legacy endpoint (deprecated)
 @app.route('/api/oauth/<provider>', methods=['GET', 'OPTIONS'])
 def oauth_login(provider):
-    """Initiate OAuth flow for a provider"""
-    try:
-        provider = provider.lower()
-        if provider not in ['google', 'facebook', 'microsoft', 'github']:
-            return jsonify({'error': f'Provider {provider} not supported'}), 400
-        
-        auth_url = get_oauth_auth_url(provider)
-        if not auth_url:
-            return jsonify({
-                'error': f'{provider.capitalize()} OAuth is not configured. Please set {provider.upper()}_CLIENT_ID and {provider.upper()}_CLIENT_SECRET in environment variables.'
-            }), 500
-        
-        return jsonify({'auth_url': auth_url})
-    except Exception as e:
-        print(f"Error in oauth_login for {provider}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
-@app.route('/api/oauth/<provider>/callback', methods=['GET'])
-def oauth_callback(provider):
-    """Handle OAuth callback from provider"""
-    provider = provider.lower()
-    code = request.args.get('code')
-    state = request.args.get('state')
-    error = request.args.get('error')
-    
-    # Get frontend URL from config or request
-    frontend_url = app.config.get('FRONTEND_URL', 'http://localhost:5173')
-    
-    print(f"[OAUTH] Callback received for {provider}")
-    print(f"[OAUTH] State: {state}, Code: {'present' if code else 'missing'}, Error: {error}")
-    
-    if error:
-        print(f"[OAUTH] Error from provider: {error}")
-        return redirect(f"{frontend_url}/login?oauth_error={error}&provider={provider}")
-    
-    # Verify state - be more lenient for development
-    session_state = session.get(f'oauth_state_{provider}')
-    print(f"[OAUTH] Session state: {session_state}")
-    
-    if not session_state or session_state != state:
-        print(f"[OAUTH] State mismatch! Expected: {session_state}, Got: {state}")
-        # In development, allow if state is present (session might not persist across redirects)
-        if not state:
-            return redirect(f"{frontend_url}/login?oauth_error=invalid_state&provider={provider}")
-        print("[OAUTH] Allowing despite state mismatch (development mode)")
-    
-    session.pop(f'oauth_state_{provider}', None)
-    
-    if not code:
-        return redirect(f"{frontend_url}/login?oauth_error=no_code&provider={provider}")
-    
-    # Exchange code for token
-    redirect_uri = f"{request.host_url.rstrip('/')}/api/oauth/{provider}/callback"
-    
-    try:
-        user_info = exchange_oauth_code(provider, code, redirect_uri)
-        if not user_info:
-            print("[OAUTH] Token exchange failed - no user info returned")
-            return redirect(f"{frontend_url}/login?oauth_error=token_exchange_failed&provider={provider}")
-        
-        print(f"[OAUTH] User info received: {user_info.get('email')}")
-        
-        # Create or get user
-        user = get_or_create_oauth_user(provider, user_info)
-        if user:
-            login_user(user)
-            print(f"[OAUTH] User logged in successfully: {user.email}")
-            # Redirect to dashboard on success (not login page)
-            return redirect(f"{frontend_url}/dashboard?oauth_success=true&provider={provider}")
-        else:
-            print("[OAUTH] User creation failed")
-            return redirect(f"{frontend_url}/login?oauth_error=user_creation_failed&provider={provider}")
-    except Exception as e:
-        print(f"[OAUTH] Error for {provider}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return redirect(f"{frontend_url}/login?oauth_error={urllib.parse.quote(str(e))}&provider={provider}")
-
-# Apple Sign In (special handling - requires frontend SDK)
-@app.route('/api/oauth/apple', methods=['POST'])
-def apple_oauth():
-    """Handle Apple Sign In (uses different flow with JWT)"""
-    data = request.json or {}
-    # Apple Sign In requires JWT verification
-    # For now, return a message that it needs proper JWT verification
-    # In production, you should verify the JWT token from Apple using their public keys
+    """[DEPRECATED] Use GoogleLogin popup component instead"""
     return jsonify({
-        'error': 'Apple Sign In requires JWT token verification. Please use Apple Sign In SDK on the frontend and send the verified identity token to this endpoint.'
-    }), 501
+        'error': 'Old OAuth flow is deprecated',
+        'message': 'Use GoogleLogin popup component - POST JWT token to /api/oauth/google/callback'
+    }), 400
+
+
 
 
 # ==================== ADMIN API ENDPOINTS ====================

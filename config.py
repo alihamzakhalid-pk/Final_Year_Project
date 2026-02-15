@@ -1,7 +1,13 @@
 import os
 from dotenv import load_dotenv
 
+# Load existing .env and also support a file named `env` (some setups use this instead of `.env')
 load_dotenv()
+
+# Also support loading a file named `env` (some setups use this instead of `.env')
+# This allows the repository's `env` file to be picked up in local dev.
+if os.path.exists('env'):
+    load_dotenv('env', override=True)
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-change-in-prod'

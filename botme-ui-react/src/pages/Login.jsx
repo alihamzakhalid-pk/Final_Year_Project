@@ -2,51 +2,73 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Mail } from 'lucide-react'
+import { GoogleLogin } from '@react-oauth/google'
 import AuthForm from '../components/AuthForm'
 import VerificationCodeInput from '../components/VerificationCodeInput'
 import UICard from '../components/ui/Card'
 import UIButton from '../components/ui/Button'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../components/ui/Toast'
+import api from '../api/axios'
 
 export default function Login() {
-  const { login, verifyLogin, oauthLogin } = useAuth()
+  const { login, verifyLogin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const { showSuccess, showError } = useToast()
   const from = location.state?.from || '/dashboard'
-  const [step, setStep] = useState('form') // 'form' or 'verify'
+  const [step, setStep] = useState('form') // 'form' or 'verify' or 'google_verify'
   const [email, setEmail] = useState('')
+  const [googleEmail, setGoogleEmail] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Handle OAuth callback
+  // Handle OAuth callback (if coming from old redirect flow)
   useEffect(() => {
     const oauthSuccess = searchParams.get('oauth_success')
-    const oauthError = searchParams.get('oauth_error')
-    const provider = searchParams.get('provider')
-
     if (oauthSuccess === 'true') {
-      showSuccess(`Successfully signed in with ${provider || 'OAuth'}!`)
-      // Refresh user data
+      showSuccess('Successfully signed in!')
       setTimeout(() => {
         window.location.href = '/dashboard'
-      }, 1000)
-    } else if (oauthError) {
-      showError(`OAuth error: ${oauthError}`)
+      }, 500)
     }
-  }, [searchParams, showSuccess, showError])
+  }, [searchParams, showSuccess])
 
-  const handleSocialLogin = async (provider) => {
+  const handleGoogleSuccess = async (credentialResponse) => {
     try {
       setLoading(true)
-      const providerLower = provider.toLowerCase()
-      await oauthLogin(providerLower)
-      // The redirect will happen automatically
+      const token = credentialResponse.credential
+
+      // Send JWT token to backend
+      const { data } = await api.post('/api/oauth/google/callback', { token })
+
+      if (data?.requiresVerification) {
+        // New user - show verification step
+        setGoogleEmail(data.email)
+        setStep('google_verify')
+        showSuccess('Verification code sent to your email!')
+        // In dev mode, show the code
+        if (data?.devMode && data?.code) {
+          showSuccess(`Dev mode - Code: ${data.code}`)
+        }
+      } else if (data?.user) {
+        // Existing user - login directly
+        showSuccess('Logged in successfully!')
+        setTimeout(() => {
+          navigate(from, { replace: true })
+        }, 500)
+      }
     } catch (error) {
-      showError(error?.message || `Failed to sign in with ${provider}. Please try again.`)
+      console.error('Google login error:', error)
+      showError(error?.response?.data?.error || error?.message || 'Google login failed')
+    } finally {
       setLoading(false)
     }
+  }
+
+  const handleGoogleError = () => {
+    showError('Google login failed. Please try again.')
+    setLoading(false)
   }
 
   return (
@@ -72,22 +94,16 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Social Auth Button - Google Only */}
+          {/* Google OAuth Button - New Popup Method */}
           <div className="mb-6">
-            <UIButton
-              variant="outline"
-              className="w-full flex items-center justify-center gap-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 text-[#1F2937] dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-              onClick={() => handleSocialLogin('Google')}
-              disabled={loading}
-            >
-              <svg className="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-              </svg>
-              <span>Continue with Google</span>
-            </UIButton>
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                text="signin_with"
+                logo_alignment="center"
+              />
+            </div>
           </div>
 
           {/* Divider */}
@@ -127,8 +143,63 @@ export default function Login() {
               }}
               disabled={loading}
             />
+          ) : step === 'google_verify' ? (
+            /* Google OAuth Verification Step */
+            <div className="space-y-6">
+              <div className="text-center space-y-2">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#E8F0FF] dark:bg-slate-700 mb-4"
+                >
+                  <Mail className="h-8 w-8 text-[#5B7FFF]" />
+                </motion.div>
+                <h2 className="text-2xl font-bold text-[#1F2937] dark:text-slate-100">Verify your email</h2>
+                <p className="text-sm text-[#6B7280] dark:text-slate-400">
+                  We've sent a 6-digit code to
+                  <br />
+                  <span className="font-semibold text-[#1F2937] dark:text-slate-200">{googleEmail}</span>
+                </p>
+              </div>
+
+              <VerificationCodeInput
+                length={6}
+                onComplete={async (code) => {
+                  try {
+                    setLoading(true)
+                    const { data } = await api.post('/api/oauth/verify-signup', {
+                      email: googleEmail,
+                      code
+                    })
+                    if (data?.user) {
+                      // Store token
+                      localStorage.setItem('auth_token', data.token || 'session')
+                      showSuccess('Account created successfully! Redirecting to dashboard...')
+                      setTimeout(() => {
+                        window.location.href = '/dashboard'
+                      }, 500)
+                    }
+                  } catch (error) {
+                    showError(error?.response?.data?.error || 'Invalid verification code. Please try again.')
+                  } finally {
+                    setLoading(false)
+                  }
+                }}
+                disabled={loading}
+              />
+
+              <div className="text-center space-y-3">
+                <button
+                  onClick={() => setStep('form')}
+                  className="mx-auto text-sm text-[#6B7280] dark:text-slate-400 hover:text-[#5B7FFF]"
+                  disabled={loading}
+                >
+                  Back to login form
+                </button>
+              </div>
+            </div>
           ) : (
-            /* Verification Step */
+            /* Email Verification Step */
             <div className="space-y-6">
               <div className="text-center space-y-2">
                 <motion.div
