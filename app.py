@@ -25,6 +25,20 @@ from rag_chatbot import (
     delete_vector_store
 )
 
+import socket
+
+# Force IPv4 for Gmail SMTP to avoid [Errno 101] Network is unreachable on Render
+# This monkey-patches socket.getaddrinfo to only return IPv4 addresses for smtp.gmail.com
+_orig_getaddrinfo = socket.getaddrinfo
+
+def _patched_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    if host == 'smtp.gmail.com':
+        family = socket.AF_INET
+    return _orig_getaddrinfo(host, port, family, type, proto, flags)
+
+socket.getaddrinfo = _patched_getaddrinfo
+
+
 app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
@@ -56,6 +70,17 @@ def generate_verification_code():
     return ''.join(random.choices(string.digits, k=6))
 
 
+from threading import Thread
+
+def send_async_email(app_instance, msg):
+    """Send email in a background thread"""
+    with app_instance.app_context():
+        try:
+            mail.send(msg)
+            print(f"[EMAIL] Successfully sent email to {msg.recipients}")
+        except Exception as e:
+            print(f"[EMAIL ERROR] Failed to send email: {str(e)}")
+
 def send_verification_email(email, code, purpose='signup'):
     """Send verification or reset code email"""
     try:
@@ -80,22 +105,7 @@ If you didn't request this code, please ignore this email.
 Best regards,
 BotMe Team
 """
-        elif purpose == 'login':
-            subject = f"Your BotMe Login Code - {code}"
-            body = f"""
-Hello!
 
-Please use the following verification code to complete your login:
-
-Verification Code: {code}
-
-This code will expire in 10 minutes.
-
-If you didn't request this code, please ignore this email.
-
-Best regards,
-BotMe Team
-"""
         else:  # password reset
             subject = "Reset your BotMe password"
             body = f"""
@@ -111,20 +121,23 @@ Best regards,
 BotMe Team
 """
 
-        print(f"[EMAIL] Attempting to send email to {email} via {app.config.get('MAIL_SERVER')}:{app.config.get('MAIL_PORT')}")
+        print(f"[EMAIL] Attempting to send email to {email}")
         msg = Message(subject=subject, recipients=[email], body=body)
-        mail.send(msg)
-        print(f"[EMAIL] Successfully sent verification code to {email}")
+        
+        # Send asynchronously!
+        # Use app._get_current_object() if app is not globally available/preferred, 
+        # but here we have 'app' from line 26
+        Thread(target=send_async_email, args=(app, msg)).start()
+        
         return True
     except TimeoutError as e:
         print(f"[EMAIL ERROR] Email send timeout: {str(e)}")
         print("[EMAIL] Consider: Check network connectivity, verify SMTP server is accessible, or increase timeout")
         return False
     except Exception as e:
-        print(f"[EMAIL ERROR] Failed to send email: {type(e).__name__}: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        print(f"[EMAIL ERROR] Error preparing email: {str(e)}")
         return False
+
 
 
 def serialize_user(user):
@@ -158,9 +171,19 @@ def unauthorized():
         return jsonify({'error': 'Unauthorized'}), 401
     return redirect(url_for('login'))
 
+from functools import wraps
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not getattr(current_user, 'is_admin', False):
+            return jsonify({'error': 'Admin privileges required'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Create DB tables and clean up old temp entries on startup
 with app.app_context():
@@ -424,50 +447,60 @@ def api_login():
     }), 200
 
 
-@app.route('/api/verify-login', methods=['POST'])
-def api_verify_login():
-    """Verify code and login"""
-    data = request.json or {}
-    email = (data.get('email') or '').strip().lower()
-    code = data.get('code', '').strip()
+# ==========================================
+# OAUTH ROUTES (Google, Facebook, etc.)
+# ==========================================
+
+@app.route('/api/oauth/<provider>/login')
+def oauth_login(provider):
+    """Initiate OAuth login flow"""
+    auth_url = get_oauth_auth_url(provider)
+    if not auth_url:
+        return jsonify({'error': f'Unsupported provider {provider} or missing configuration'}), 400
+    return redirect(auth_url)
+
+
+@app.route('/api/oauth/<provider>/callback')
+def oauth_callback(provider):
+    """Handle OAuth callback"""
+    code = request.args.get('code')
+    error = request.args.get('error')
     
-    if not email or not code:
-        return jsonify({'error': 'Missing email or verification code'}), 400
+    if error:
+        return jsonify({'error': f'Provider error: {error}'}), 400
+        
+    if not code:
+        return jsonify({'error': 'Missing authorization code'}), 400
     
-    # Find verification code
-    verification = VerificationCode.query.filter_by(
-        email=email, 
-        code=code, 
-        purpose='login'
-    ).first()
+    # Construct the same redirect URI used to start the flow
+    # Logic matches oauth_handler.py default
+    if provider == 'google' and app.config.get('GOOGLE_REDIRECT_URI'):
+        redirect_uri = app.config['GOOGLE_REDIRECT_URI']
+    else:
+        # Must match the one generated in get_oauth_auth_url
+        redirect_uri = url_for('oauth_callback', provider=provider, _external=True)
+        # Ensure 'http' vs 'https' matches what Render usage expects if behind proxy
+        if request.headers.get('X-Forwarded-Proto') == 'https':
+            redirect_uri = redirect_uri.replace('http:', 'https:')
+
+    user_info = exchange_oauth_code(provider, code, redirect_uri)
+    if not user_info:
+        return jsonify({'error': 'Failed to authenticate with provider. Token exchange failed.'}), 401
     
-    if not verification:
-        return jsonify({'error': 'Invalid verification code'}), 400
-    
-    if verification.is_expired():
-        db.session.delete(verification)
-        db.session.commit()
-        return jsonify({'error': 'Verification code has expired. Please request a new one.'}), 400
-    
-    # Find user
-    user = User.query.filter_by(email=email).first()
+    # Get or create local user account
+    user = get_or_create_oauth_user(provider, user_info)
     if not user:
-        db.session.delete(verification)
-        db.session.commit()
-        return jsonify({'error': 'User not found'}), 404
-    
-    # Delete verification code
-    db.session.delete(verification)
-    db.session.commit()
-    
-    # Login user
+         return jsonify({'error': 'Failed to create or retrieve user'}), 500
+         
+    # Login the user
     login_user(user)
     
-    return jsonify({
-        'message': 'Logged in successfully',
-        'user': serialize_user(user),
-        'token': 'session'
-    }), 200
+    # Redirect to Frontend Dashboard
+    frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+    return redirect(f"{frontend_url}/dashboard")
+
+
+
 
 
 @app.route('/api/request-password-reset', methods=['POST'])
@@ -1047,6 +1080,7 @@ def api_personality_analysis(chat_id):
         print(f"[PERSONALITY] ====== END ERROR ======")
         return jsonify({'error': f'Failed to analyze personality: {str(e)}'}), 500
 
+<<<<<<< HEAD
 # ==================== JWT-BASED GOOGLE OAUTH ENDPOINT ====================
 
 @app.route('/api/oauth/google/callback', methods=['POST'])
@@ -1239,6 +1273,18 @@ def oauth_verify_signup():
 @app.route('/api/oauth/<provider>', methods=['GET', 'OPTIONS'])
 def oauth_login(provider):
     """[DEPRECATED] Use GoogleLogin popup component instead"""
+=======
+
+
+# Apple Sign In (special handling - requires frontend SDK)
+@app.route('/api/oauth/apple', methods=['POST'])
+def apple_oauth():
+    """Handle Apple Sign In (uses different flow with JWT)"""
+    data = request.json or {}
+    # Apple Sign In requires JWT verification
+    # For now, return a message that it needs proper JWT verification
+    # In production, you should verify the JWT token from Apple using their public keys
+>>>>>>> fd28afaa34a6b3ca12c30b0ca85f5283dd59e554
     return jsonify({
         'error': 'Old OAuth flow is deprecated',
         'message': 'Use GoogleLogin popup component - POST JWT token to /api/oauth/google/callback'
@@ -1249,17 +1295,7 @@ def oauth_login(provider):
 
 # ==================== ADMIN API ENDPOINTS ====================
 
-def admin_required(f):
-    """Decorator to require admin access"""
-    from functools import wraps
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated:
-            return jsonify({'error': 'Authentication required'}), 401
-        if not getattr(current_user, 'is_admin', False):
-            return jsonify({'error': 'Admin access required'}), 403
-        return f(*args, **kwargs)
-    return decorated_function
+
 
 
 @app.route('/api/admin/stats', methods=['GET'])

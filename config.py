@@ -18,8 +18,8 @@ class Config:
     MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # 5MB for uploads
     # Cookie/session settings for dev via Vite proxy (same-origin requests)
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = 'Lax'   # safe default for same-origin via proxy
-    SESSION_COOKIE_SECURE = False     # set True behind HTTPS in prod
+    SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
+    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() in ['true', '1']
     
     # Flask-Mail configuration
     MAIL_SERVER = os.environ.get('MAIL_SERVER') or 'smtp.gmail.com'

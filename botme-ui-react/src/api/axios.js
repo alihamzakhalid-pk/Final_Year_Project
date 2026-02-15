@@ -1,10 +1,23 @@
-// API Base URL Configuration
-// In production (Render), use the deployed backend URL
-// In development (localhost), use empty string for Vite proxy
-const isLocalhost = typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-const baseURL = isLocalhost ? '' : 'https://botme-ai.onrender.com'
-console.log('[API] Using base URL:', baseURL || '(localhost proxy)')
+// API Base URL
+// 1. Env Var (Best Practice)
+// 2. Fallback to hardcoded Production URL if missing (Robustness)
+// 3. Empty for Localhost (uses Vite proxy)
+const getBaseUrl = () => {
+  // Check both variable names (VITE_API_BASE_URL is preferred, but VITE_API_URL is common/legacy)
+  if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
+
+  // If no env var, and we are NOT on localhost, assume production
+  if (!window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
+    console.warn('[API] VITE_API_BASE_URL not set. Falling back to production default.')
+    return 'https://botme-ai.onrender.com'
+  }
+
+  return ''
+}
+
+export const baseURL = getBaseUrl()
+console.log('[API] Using base URL:', baseURL || '(dev proxy)')
 
 const requestInterceptors = []
 
@@ -40,7 +53,9 @@ const parseJson = async (response) => {
   try {
     return JSON.parse(text)
   } catch (error) {
-    return {}
+    // If parsing fails (e.g. HTML response from 404/500), throw error
+    console.error('[API] Failed to parse JSON:', text.slice(0, 150))
+    throw new Error('Received invalid response from server (expected JSON)')
   }
 }
 

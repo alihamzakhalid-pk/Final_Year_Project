@@ -1,5 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import api from '../api/axios'
+import api, { baseURL } from '../api/axios'
+
+// ... existing code ...
+
+
 
 const AuthContext = createContext(null)
 
@@ -46,15 +50,7 @@ export function AuthProvider({ children }) {
     return data
   }
 
-  const verifyLogin = async ({ email, code }) => {
-    const { data } = await api.post('/api/verify-login', { email, code })
-    const token = data?.token || data?.accessToken || 'demo-auth-token'
-    localStorage.setItem('auth_token', token)
-    if (data?.user) {
-      setUser(data.user)
-    }
-    return data
-  }
+
 
   const signup = async ({ fullName, email, password }) => {
     const { data } = await api.post('/api/signup', { fullName, email, password })
@@ -97,20 +93,9 @@ export function AuthProvider({ children }) {
     return data
   }
 
-  const oauthLogin = async (provider) => {
-    try {
-      const { data } = await api.get(`/api/oauth/${provider}`)
-      if (data?.auth_url) {
-        // Redirect to OAuth provider
-        window.location.href = data.auth_url
-      } else {
-        throw new Error(data?.error || 'Failed to get OAuth URL')
-      }
-    } catch (error) {
-      // Handle different error formats
-      const errorMessage = error?.data?.error || error?.response?.data?.error || error?.message || `Failed to initiate ${provider} login`
-      throw new Error(errorMessage)
-    }
+  const oauthLogin = (provider) => {
+    // Redirect to backend OAuth login endpoint
+    window.location.href = `${baseURL}/api/oauth/${provider}/login`
   }
 
   const value = useMemo(
@@ -118,7 +103,7 @@ export function AuthProvider({ children }) {
       user,
       loading,
       login,
-      verifyLogin,
+
       signup,
       verifySignup,
       logout,

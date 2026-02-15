@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+<<<<<<< HEAD
 import { Mail } from 'lucide-react'
 import { GoogleLogin } from '@react-oauth/google'
+=======
+>>>>>>> fd28afaa34a6b3ca12c30b0ca85f5283dd59e554
 import AuthForm from '../components/AuthForm'
-import VerificationCodeInput from '../components/VerificationCodeInput'
 import UICard from '../components/ui/Card'
 import UIButton from '../components/ui/Button'
 import { useAuth } from '../hooks/useAuth'
@@ -12,15 +14,22 @@ import { useToast } from '../components/ui/Toast'
 import api from '../api/axios'
 
 export default function Login() {
+<<<<<<< HEAD
   const { login, verifyLogin } = useAuth()
+=======
+  const { login, oauthLogin } = useAuth()
+>>>>>>> fd28afaa34a6b3ca12c30b0ca85f5283dd59e554
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const { showSuccess, showError } = useToast()
   const from = location.state?.from || '/dashboard'
+<<<<<<< HEAD
   const [step, setStep] = useState('form') // 'form' or 'verify' or 'google_verify'
   const [email, setEmail] = useState('')
   const [googleEmail, setGoogleEmail] = useState('')
+=======
+>>>>>>> fd28afaa34a6b3ca12c30b0ca85f5283dd59e554
   const [loading, setLoading] = useState(false)
 
   // Handle OAuth callback (if coming from old redirect flow)
@@ -116,30 +125,20 @@ export default function Login() {
             </div>
           </div>
 
-          {step === 'form' ? (
-            /* Email Login Form */
-            <AuthForm
-              mode="login"
-              onSubmit={async ({ email, password, identifier }) => {
-                try {
-                  setLoading(true)
-                  const data = await login({ email, identifier, password })
-                  // Direct login - navigate to dashboard immediately
-                  if (data?.user) {
-                    showSuccess('Logged in successfully!')
-                    navigate(from, { replace: true })
-                  } else {
-                    // Fallback for verification flow (if ever needed)
-                    const userEmail = data?.email || email || identifier
-                    setEmail(userEmail)
-                    setStep('verify')
-                    showSuccess('Verification code sent to your email!')
-                  }
-                } catch (error) {
-                  showError(error?.message || 'Login failed. Please try again.')
-                } finally {
-                  setLoading(false)
+          {/* Email Login Form */}
+          <AuthForm
+            mode="login"
+            onSubmit={async ({ email, password, identifier }) => {
+              try {
+                setLoading(true)
+                const data = await login({ email, identifier, password })
+                if (data?.user) {
+                  showSuccess('Logged in successfully!')
+                  navigate(from, { replace: true })
+                } else {
+                  showError('Login failed. Unexpected response from server.')
                 }
+<<<<<<< HEAD
               }}
               disabled={loading}
             />
@@ -264,6 +263,16 @@ export default function Login() {
               </div>
             </div>
           )}
+=======
+              } catch (error) {
+                showError(error?.message || 'Login failed. Please check your credentials and try again.')
+              } finally {
+                setLoading(false)
+              }
+            }}
+            disabled={loading}
+          />
+>>>>>>> fd28afaa34a6b3ca12c30b0ca85f5283dd59e554
 
           <p className="text-center text-sm text-[#6B7280] dark:text-slate-400 mt-6">
             New here?{' '}
