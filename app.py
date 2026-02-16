@@ -75,8 +75,16 @@ def generate_verification_code():
 
 from threading import Thread
 
+def send_async_email(app, msg):
+    with app.app_context():
+        try:
+            mail.send(msg)
+            print(f"[EMAIL] [OK] Background thread successfully sent email")
+        except Exception as e:
+            print(f"[EMAIL ERROR] Background thread failed to send email: {str(e)}")
+
 def send_verification_email(email, code, purpose='signup'):
-    """Send verification or reset code email"""
+    """Send verification or reset code email (ASYNCHRONOUS)"""
     try:
         # [DEBUG] ALWAYS PRINT CODE TO CONSOLE
         print(f"\n[APP DEBUG] [KEY] Sending Code to {email}: {code}\n")
@@ -118,19 +126,17 @@ Best regards,
 BotMe Team
 """
 
-        print(f"[EMAIL] Attempting to send email to {email}")
+        print(f"[EMAIL] Triggering background thread to send email to {email}")
         msg = Message(subject=subject, recipients=[email], body=body)
         
-        # Send email SYNCHRONOUSLY (wait for result)
-        mail.send(msg)
-        print(f"[EMAIL] [OK] Successfully sent email to {email}")
+        # Start a background thread to send the email so we don't block the worker
+        thread = Thread(target=send_async_email, args=(app, msg))
+        thread.start()
         
         return True
     except Exception as e:
-        print(f"[EMAIL ERROR] Failed to send email to {email}")
+        print(f"[EMAIL ERROR] Failed to trigger email thread for {email}")
         print(f"[EMAIL ERROR] Exception: {type(e).__name__}: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return False
 
 
