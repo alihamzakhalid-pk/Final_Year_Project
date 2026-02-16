@@ -24,9 +24,9 @@ with app.app_context():
         )
         print("\nAttempting to send test email...")
         mail.send(msg)
-        print("✓ Email sent successfully!")
+        print("[OK] Email sent successfully!")
         
     except Exception as e:
-        print(f"\n✗ Email error: {type(e).__name__}: {str(e)}")
+        print(f"\n[ERROR] Email error: {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()

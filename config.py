@@ -21,10 +21,11 @@ class Config:
     SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
     SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() in ['true', '1']
     
-    # Flask-Mail configuration
+    # Flask-Mail configuration (Gmail SMTP)
     MAIL_SERVER = os.environ.get('MAIL_SERVER') or 'smtp.gmail.com'
     MAIL_PORT = int(os.environ.get('MAIL_PORT') or 587)
     MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
+    MAIL_USE_SSL = os.environ.get('MAIL_USE_SSL', 'false').lower() in ['true', 'on', '1']
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER') or MAIL_USERNAME
@@ -42,7 +43,7 @@ class Config:
     GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET')
 
     # OAuth redirect URI overrides (optional)
-    GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'http://localhost:5000/api/oauth/google/callback')
+    # GOOGLE_REDIRECT_URI removed as per user request (legacy logic)
     
     # Frontend URL for OAuth redirects
     FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')

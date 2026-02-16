@@ -11,6 +11,8 @@ ENV/
 # Flask
 instance/
 .env
+.env.local
+firebase-credentials.json
 *.db
 
 # Frontend

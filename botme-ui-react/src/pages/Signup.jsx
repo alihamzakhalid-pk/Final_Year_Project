@@ -169,7 +169,7 @@ export default function Signup() {
                 onSubmit={async ({ fullName, email, password }) => {
                   try {
                     setLoading(true)
-                    const data = await signup({ fullName, email, password })
+                    await signup({ fullName, email, password })
                     setEmail(email)
                     setStep('verify')
                     showSuccess('Verification code sent to your email!')

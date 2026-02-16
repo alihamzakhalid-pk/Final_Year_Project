@@ -25,20 +25,6 @@ from rag_chatbot import (
     delete_vector_store
 )
 
-import socket
-
-# Force IPv4 for Gmail SMTP to avoid [Errno 101] Network is unreachable on Render
-# This monkey-patches socket.getaddrinfo to only return IPv4 addresses for smtp.gmail.com
-_orig_getaddrinfo = socket.getaddrinfo
-
-def _patched_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-    if host == 'smtp.gmail.com':
-        family = socket.AF_INET
-    return _orig_getaddrinfo(host, port, family, type, proto, flags)
-
-socket.getaddrinfo = _patched_getaddrinfo
-
-
 app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
@@ -89,18 +75,12 @@ def generate_verification_code():
 
 from threading import Thread
 
-def send_async_email(app_instance, msg):
-    """Send email in a background thread"""
-    with app_instance.app_context():
-        try:
-            mail.send(msg)
-            print(f"[EMAIL] Successfully sent email to {msg.recipients}")
-        except Exception as e:
-            print(f"[EMAIL ERROR] Failed to send email: {str(e)}")
-
 def send_verification_email(email, code, purpose='signup'):
     """Send verification or reset code email"""
     try:
+        # [DEBUG] ALWAYS PRINT CODE TO CONSOLE
+        print(f"\n[APP DEBUG] [KEY] Sending Code to {email}: {code}\n")
+
         # Check if mail is configured
         if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
             print("[EMAIL ERROR] MAIL_USERNAME or MAIL_PASSWORD not configured in .env file")
@@ -141,18 +121,16 @@ BotMe Team
         print(f"[EMAIL] Attempting to send email to {email}")
         msg = Message(subject=subject, recipients=[email], body=body)
         
-        # Send asynchronously!
-        # Use app._get_current_object() if app is not globally available/preferred, 
-        # but here we have 'app' from line 26
-        Thread(target=send_async_email, args=(app, msg)).start()
+        # Send email SYNCHRONOUSLY (wait for result)
+        mail.send(msg)
+        print(f"[EMAIL] [OK] Successfully sent email to {email}")
         
         return True
-    except TimeoutError as e:
-        print(f"[EMAIL ERROR] Email send timeout: {str(e)}")
-        print("[EMAIL] Consider: Check network connectivity, verify SMTP server is accessible, or increase timeout")
-        return False
     except Exception as e:
-        print(f"[EMAIL ERROR] Error preparing email: {str(e)}")
+        print(f"[EMAIL ERROR] Failed to send email to {email}")
+        print(f"[EMAIL ERROR] Exception: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
@@ -363,21 +341,10 @@ def api_signup():
             'email': email
         }), 200
     else:
-        # Email failed: Check if we're in dev mode
-        if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
-            # Dev mode: Allow signup to continue without email
-            print(f"[DEV MODE] Email not configured. Returning verification code directly for {email}")
-            return jsonify({
-                'message': 'Dev mode: Email not configured. Use code below to verify.',
-                'email': email,
-                'code': code,  # Return code for dev/testing
-                'devMode': True
-            }), 200
-        else:
-            # Prod mode with email configured but send failed
-            return jsonify({
-                'error': 'Failed to send verification email. Please check your email configuration.'
-            }), 500
+        # Email failed
+        return jsonify({
+            'error': 'Failed to send verification email. Please check your email configuration.'
+        }), 500
 
 
 @app.route('/api/verify-signup', methods=['POST'])
@@ -494,14 +461,12 @@ def oauth_callback(provider):
     
     # Construct the same redirect URI used to start the flow
     # Logic matches oauth_handler.py default
-    if provider == 'google' and app.config.get('GOOGLE_REDIRECT_URI'):
-        redirect_uri = app.config['GOOGLE_REDIRECT_URI']
-    else:
-        # Must match the one generated in get_oauth_auth_url
-        redirect_uri = url_for('oauth_callback', provider=provider, _external=True)
-        # Ensure 'http' vs 'https' matches what Render usage expects if behind proxy
-        if request.headers.get('X-Forwarded-Proto') == 'https':
-            redirect_uri = redirect_uri.replace('http:', 'https:')
+    # Must match the one generated in get_oauth_auth_url
+    redirect_uri = url_for('oauth_callback', provider=provider, _external=True)
+    
+    # Ensure 'http' vs 'https' matches what Render usage expects if behind proxy
+    if request.headers.get('X-Forwarded-Proto') == 'https':
+        redirect_uri = redirect_uri.replace('http:', 'https:')
 
     user_info = exchange_oauth_code(provider, code, redirect_uri)
     if not user_info:
@@ -616,24 +581,16 @@ def api_google_id_token():
     # Try to send verification email
     email_sent = send_verification_email(google_email, code, 'signup')
     
-    response_data = {
+    if not email_sent:
+        return jsonify({'error': 'Failed to send verification email'}), 500
+    
+    print(f"[GOOGLE-ID-TOKEN] New user, verification code sent to {google_email}")
+    return jsonify({
         'new_user': True,
         'email': google_email,
         'name': google_name,
         'message': 'Verification code sent to your email'
-    }
-    
-    if not email_sent:
-        if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
-            # Dev mode: return code directly
-            print(f"[GOOGLE-ID-TOKEN] Dev mode - code for {google_email}: {code}")
-            response_data['code'] = code
-            response_data['devMode'] = True
-        else:
-            return jsonify({'error': 'Failed to send verification email'}), 500
-    
-    print(f"[GOOGLE-ID-TOKEN] New user, verification code sent to {google_email}")
-    return jsonify(response_data), 200
+    }), 200
 
 
 @app.route('/api/oauth/google/complete-signup', methods=['POST'])
@@ -746,6 +703,8 @@ def api_request_password_reset():
 
     if send_verification_email(email, code, 'reset'):
         return jsonify({'message': 'Reset code sent to your email', 'email': email}), 200
+    
+    return jsonify({'error': 'Failed to send reset email. Please check your email configuration.'}), 500
 
     return jsonify({'error': 'Failed to send reset email. Please check your email configuration.'}), 500
 
@@ -1403,25 +1362,12 @@ def google_callback():
                         'message': 'Verification code sent to your email',
                         'email': email,
                         'name': name,
-                        'code': code,
                         'new_user': True
                     }), 200
                 else:
-                    # Email failed
-                    if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
-                        print(f"[DEV MODE] Email not configured. Returning verification code directly")
-                        return jsonify({
-                            'message': 'Dev mode: Email not configured. Use code below to verify.',
-                            'email': email,
-                            'name': name,
-                            'code': code,
-                            'devMode': True,
-                            'new_user': True
-                        }), 200
-                    else:
-                        return jsonify({
-                            'error': 'Failed to send verification email. Please try again.'
-                        }), 500
+                    return jsonify({
+                        'error': 'Failed to send verification email. Please try again.'
+                    }), 500
             
             # Existing user - login immediately
             login_user(user)
@@ -1769,14 +1715,15 @@ def debug_test_email(email):
             'MAIL_PORT': app.config.get('MAIL_PORT'),
             'MAIL_USERNAME': app.config.get('MAIL_USERNAME'),
             'MAIL_PASSWORD': 'SET' if app.config.get('MAIL_PASSWORD') else 'NOT SET',
-            'MAIL_USE_TLS': app.config.get('MAIL_USE_TLS')
+            'MAIL_USE_TLS': app.config.get('MAIL_USE_TLS'),
+            'MAIL_USE_SSL': app.config.get('MAIL_USE_SSL')
         }
         
         if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
             return jsonify({
                 'error': 'Mail credentials not configured',
                 'config': config_check
-            }), 500
+            }), 200  # Return 200 so browser shows the JSON
 
         msg = Message(
             subject="BotMe Debug Email",
@@ -1802,7 +1749,7 @@ def debug_test_email(email):
             'error': str(e),
             'traceback': error_trace,
             'config': config_check
-        }), 500
+        }), 200  # Return 200 so browser shows the JSON
 
 if __name__ == '__main__':
     # Bind explicitly to 127.0.0.1:5000 to match Vite proxy default
