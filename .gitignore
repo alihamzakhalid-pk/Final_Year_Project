@@ -13,6 +13,8 @@ instance/
 .env
 .env.local
 firebase-credentials.json
+*-firebase-adminsdk-*.json
+botme-ai-*.json
 *.db
 
 # Frontend

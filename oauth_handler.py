@@ -265,6 +265,13 @@ def get_or_create_oauth_user(provider, user_info):
         oauth_id=str(oauth_id),
         password_hash=None  # OAuth users don't have passwords
     )
+    
+    # Auto-promote Admin
+    from app import app
+    if email == app.config.get('ADMIN_EMAIL'):
+        user.is_admin = True
+        print(f"[OAUTH] Auto-promoting {email} to Admin during OAuth creation")
+
     db.session.add(user)
     db.session.commit()
     

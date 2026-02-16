@@ -383,6 +383,12 @@ def api_verify_signup():
     # Create user
     user = User(username=username, email=email)
     user.set_password(password)
+    
+    # Auto-promote Admin
+    if email == app.config.get('ADMIN_EMAIL'):
+        user.is_admin = True
+        print(f"[AUTH] Auto-promoting {email} to Admin on Signup")
+
     db.session.add(user)
     
     # Delete verification code
@@ -424,6 +430,12 @@ def api_login():
             'error': f'This account uses {user.oauth_provider.capitalize()} sign-in. Please use that provider to log in.'
         }), 400
     
+    # Auto-promote Admin on login if needed
+    if user.email == app.config.get('ADMIN_EMAIL') and not user.is_admin:
+        user.is_admin = True
+        db.session.commit()
+        print(f"[AUTH] Auto-promoting {user.email} to Admin on Login")
+
     # Direct login - create session immediately
     login_user(user)
     
@@ -541,6 +553,12 @@ def api_google_id_token():
             user.oauth_id = str(google_id)
             db.session.commit()
         
+        # Auto-promote Admin on Google Login if needed
+        if user.email == app.config.get('ADMIN_EMAIL') and not user.is_admin:
+            user.is_admin = True
+            db.session.commit()
+            print(f"[GOOGLE-ID-TOKEN] Auto-promoting existing user {user.email} to Admin")
+
         login_user(user)
         user.last_login = datetime.utcnow()
         db.session.commit()
@@ -646,6 +664,12 @@ def api_google_complete_signup():
         oauth_provider='google',
         oauth_id=str(google_id) if google_id else None
     )
+
+    # Auto-promote Admin
+    if email == app.config.get('ADMIN_EMAIL'):
+        user.is_admin = True
+        print(f"[GOOGLE-COMPLETE] Auto-promoting {email} to Admin on Creation")
+
     user.set_password(password)
     db.session.add(user)
     

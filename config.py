@@ -11,6 +11,7 @@ if os.path.exists('env'):
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-change-in-prod'
+    ADMIN_EMAIL = 'alihamzakhalid.pk@gmail.com'  # Hardcoded Admin Email
     SQLALCHEMY_DATABASE_URI = 'sqlite:///botme.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
