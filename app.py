@@ -608,12 +608,13 @@ def api_google_id_token():
     if not email_sent:
         return jsonify({'error': 'Failed to send verification email'}), 500
     
-    print(f"[GOOGLE-ID-TOKEN] New user, verification code sent to {google_email}")
+    print(f"[GOOGLE-ID-TOKEN] New user, verification code ({code}) sent to {google_email} and returned to frontend")
     return jsonify({
         'new_user': True,
         'email': google_email,
         'name': google_name,
-        'message': 'Verification code sent to your email'
+        'code': code,  # Return the code directly for auto-verification
+        'message': 'Google account verified. Please set your password.'
     }), 200
 
 

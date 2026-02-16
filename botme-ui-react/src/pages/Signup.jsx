@@ -28,6 +28,7 @@ export default function Signup() {
   const [googleName, setGoogleName] = useState('')
   const [googlePassword, setGooglePassword] = useState('')
   const [googleConfirm, setGoogleConfirm] = useState('')
+  const [googleVerifyCode, setGoogleVerifyCode] = useState('')
   const [passwordError, setPasswordError] = useState('')
 
   const handleGoogleSignup = async (credentialResponse) => {
@@ -45,6 +46,7 @@ export default function Signup() {
         console.log('[OAUTH] New user detected, showing password setup')
         setGoogleEmail(data.email || '')
         setGoogleName(data.name || '')
+        setGoogleVerifyCode(data.code || '') // Store the code for auto-verification
         setStep('google_password')
         showSuccess('Google account verified! Please set a password for your account.')
         if (data?.devMode && data?.code) {
@@ -87,9 +89,9 @@ export default function Signup() {
       return
     }
 
-    // Move to verification code step
-    setStep('google_verify')
-    showSuccess('Now enter the verification code sent to your email.')
+    // AUTO-COMPLETE: Use the code we got earlier to verify in the background
+    console.log('[OAUTH] Auto-verifying Google account...')
+    handleVerifyComplete(googleVerifyCode)
   }
 
   const handleVerifyComplete = async (code) => {
