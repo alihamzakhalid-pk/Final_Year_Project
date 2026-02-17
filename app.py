@@ -85,6 +85,7 @@ def send_async_email(app, msg):
 
 def send_verification_email(email, code, purpose='signup'):
     """Send verification or reset code email (ASYNCHRONOUS)"""
+    # OTP AUTH DISABLED TEMPORARILY - But keeping for future or logs
     try:
         # [DEBUG] ALWAYS PRINT CODE TO CONSOLE
         print(f"\n[APP DEBUG] [KEY] Sending Code to {email}: {code}\n")
@@ -96,48 +97,23 @@ def send_verification_email(email, code, purpose='signup'):
 
         if purpose == 'signup':
             subject = f"Your BotMe Verification Code - {code}"
-            body = f"""
-Hello!
-
-Thank you for signing up for BotMe. Please use the following verification code to complete your registration:
-
-Verification Code: {code}
-
-This code will expire in 10 minutes.
-
-If you didn't request this code, please ignore this email.
-
-Best regards,
-BotMe Team
-"""
-
+            body = f"Verification Code: {code}"
         else:  # password reset
             subject = "Reset your BotMe password"
-            body = f"""
-Hello!
-
-We received a request to reset the password for your BotMe account.
-
-Use this verification code to reset your password: {code}
-
-This code will expire in 10 minutes. If you did not request a password reset, you can safely ignore this email.
-
-Best regards,
-BotMe Team
-"""
+            body = f"Reset Code: {code}"
 
         print(f"[EMAIL] Triggering background thread to send email to {email}")
         msg = Message(subject=subject, recipients=[email], body=body)
         
-        # Start a background thread to send the email so we don't block the worker
+        # Start a background thread to send the email
         thread = Thread(target=send_async_email, args=(app, msg))
         thread.start()
         
         return True
     except Exception as e:
-        print(f"[EMAIL ERROR] Failed to trigger email thread for {email}")
-        print(f"[EMAIL ERROR] Exception: {type(e).__name__}: {str(e)}")
+        print(f"[EMAIL ERROR] Failed to send email: {str(e)}")
         return False
+
 
 
 
@@ -295,11 +271,7 @@ def api_me():
 
 @app.route('/api/signup', methods=['POST'])
 def api_signup():
-    """Send verification code for signup
-    
-    In production: Requires email delivery
-    In dev mode (MAIL not configured): Returns code directly for testing
-    """
+    """Create account directly (No OTP)"""
     data = request.json or {}
     full_name = (data.get('fullName') or data.get('username') or '').strip()
     email = (data.get('email') or '').strip().lower()
@@ -308,100 +280,20 @@ def api_signup():
     if not email or not password:
         return jsonify({'error': 'Missing required fields'}), 400
 
-    # Check if email already exists
     if User.query.filter_by(email=email).first():
         return jsonify({'error': 'Email already exists'}), 409
 
-    # Delete any existing verification codes for this email
-    VerificationCode.query.filter_by(email=email, purpose='signup').delete()
-    
-    # Generate verification code
-    code = generate_verification_code()
-    expires_at = datetime.utcnow() + timedelta(minutes=10)
-    
-    # Store temporary user data
-    temp_data = json.dumps({
-        'fullName': full_name,
-        'email': email,
-        'password': password
-    })
-    
-    # Save verification code
-    verification = VerificationCode(
-        email=email,
-        code=code,
-        purpose='signup',
-        expires_at=expires_at,
-        temp_data=temp_data
-    )
-    db.session.add(verification)
-    db.session.commit()
-    
-    # Try to send email
-    email_sent = send_verification_email(email, code, 'signup')
-    
-    if email_sent:
-        # Success: Email was sent
-        return jsonify({
-            'message': 'Verification code sent to your email',
-            'email': email
-        }), 200
-    else:
-        # Email failed
-        return jsonify({
-            'error': 'Failed to send verification email. Please check your email configuration.'
-        }), 500
-
-
-@app.route('/api/verify-signup', methods=['POST'])
-def api_verify_signup():
-    """Verify code and create account"""
-    data = request.json or {}
-    email = (data.get('email') or '').strip().lower()
-    code = data.get('code', '').strip()
-    
-    if not email or not code:
-        return jsonify({'error': 'Missing email or verification code'}), 400
-    
-    # Find verification code
-    verification = VerificationCode.query.filter_by(
-        email=email, 
-        code=code, 
-        purpose='signup'
-    ).first()
-    
-    if not verification:
-        return jsonify({'error': 'Invalid verification code'}), 400
-    
-    if verification.is_expired():
-        db.session.delete(verification)
-        db.session.commit()
-        return jsonify({'error': 'Verification code has expired. Please request a new one.'}), 400
-    
-    # Load temporary data
-    temp_data = json.loads(verification.temp_data or '{}')
-    full_name = temp_data.get('fullName', '')
-    password = temp_data.get('password', '')
-    
-    # Generate username
+    # [OTP BYPASS] Create user directly
     username = generate_username(full_name or email.split('@')[0])
-    
-    # Create user
-    user = User(username=username, email=email)
+    user = User(username=username, email=email, full_name=full_name)
     user.set_password(password)
-    
-    # Auto-promote Admin
+
     if email == app.config.get('ADMIN_EMAIL'):
         user.is_admin = True
-        print(f"[AUTH] Auto-promoting {email} to Admin on Signup")
 
     db.session.add(user)
-    
-    # Delete verification code
-    db.session.delete(verification)
     db.session.commit()
     
-    # Login user
     login_user(user)
     
     return jsonify({
@@ -410,9 +302,17 @@ def api_verify_signup():
         'token': 'session'
     }), 201
 
+
+
+@app.route('/api/verify-signup', methods=['POST'])
+def api_verify_signup():
+    """Verify code and create account (Kept for compatibility, but deprecated)"""
+    return jsonify({'error': 'This endpoint is deprecated. Please use /api/signup directly.'}), 410
+
+
 @app.route('/api/login', methods=['POST'])
 def api_login():
-    """Direct login with password - no verification code required"""
+    """Direct login with password"""
     data = request.json or {}
     identifier = data.get('identifier') or data.get('username') or data.get('email')
     password = data.get('password')
@@ -420,36 +320,25 @@ def api_login():
     if not identifier or not password:
         return jsonify({'error': 'Missing credentials'}), 400
     
-    # Allow login by username or email
     if '@' in identifier:
         user = User.query.filter_by(email=identifier.lower()).first()
     else:
         user = User.query.filter_by(username=identifier).first()
     
-    # Verify user exists and password is correct
     if not user or not user.check_password(password):
         return jsonify({'error': 'Invalid username/email or password'}), 401
     
-    # Check if this is an OAuth-only account (no password set)
-    if user.oauth_provider and not user.password_hash:
-        return jsonify({
-            'error': f'This account uses {user.oauth_provider.capitalize()} sign-in. Please use that provider to log in.'
-        }), 400
-    
-    # Auto-promote Admin on login if needed
     if user.email == app.config.get('ADMIN_EMAIL') and not user.is_admin:
         user.is_admin = True
         db.session.commit()
-        print(f"[AUTH] Auto-promoting {user.email} to Admin on Login")
 
-    # Direct login - create session immediately
     login_user(user)
-    
     return jsonify({
         'message': 'Logged in successfully',
         'user': serialize_user(user),
         'token': 'session'
     }), 200
+
 
 
 # ==========================================
@@ -602,67 +491,36 @@ def api_google_id_token():
     db.session.add(verification)
     db.session.commit()
     
-    # Try to send verification email
-    email_sent = send_verification_email(google_email, code, 'signup')
-    
-    if not email_sent:
-        return jsonify({'error': 'Failed to send verification email'}), 500
-    
-    print(f"[GOOGLE-ID-TOKEN] New user, verification code ({code}) sent to {google_email} and returned to frontend")
+    # [OTP BYPASS] Skip sending email for Google signup
+    print(f"[GOOGLE-ID-TOKEN] New user, bypassing OTP email for {google_email}")
     return jsonify({
         'new_user': True,
         'email': google_email,
         'name': google_name,
-        'code': code,  # Return the code directly for auto-verification
+        'google_id': google_id,
+        'code': 'BYPASS_OTP',  # [OTP BYPASS]
         'message': 'Google account verified. Please set your password.'
     }), 200
 
 
+
 @app.route('/api/oauth/google/complete-signup', methods=['POST'])
 def api_google_complete_signup():
-    """Complete signup for a new Google OAuth user.
-    
-    Receives email, verification code, and password.
-    Creates the user account with both Google OAuth and password.
-    """
+    """Complete signup for a new Google OAuth user (OTP Bypassed)"""
     data = request.json or {}
     email = (data.get('email') or '').strip().lower()
     code = (data.get('code') or '').strip()
     password = data.get('password')
+    full_name = data.get('name', '')
+    google_id = data.get('google_id', '')
     
-    if not email or not code:
-        return jsonify({'error': 'Missing email or verification code'}), 400
+    if not email or not password:
+        return jsonify({'error': 'Missing required fields'}), 400
     
-    if not password or len(password) < 8:
-        return jsonify({'error': 'Password must be at least 8 characters'}), 400
-    
-    # Find verification code
-    verification = VerificationCode.query.filter_by(
-        email=email,
-        code=code,
-        purpose='signup'
-    ).first()
-    
-    if not verification:
-        return jsonify({'error': 'Invalid verification code'}), 400
-    
-    if verification.is_expired():
-        db.session.delete(verification)
-        db.session.commit()
-        return jsonify({'error': 'Verification code has expired. Please try again.'}), 400
-    
-    # Load Google info from temp_data
-    temp_data = json.loads(verification.temp_data or '{}')
-    full_name = temp_data.get('fullName', '')
-    google_id = temp_data.get('google_id', '')
-    
-    # Double-check user doesn't already exist
+    # [OTP BYPASS] We don't check the code anymore
     if User.query.filter_by(email=email).first():
-        db.session.delete(verification)
-        db.session.commit()
-        return jsonify({'error': 'An account with this email already exists. Please log in instead.'}), 409
+        return jsonify({'error': 'An account with this email already exists.'}), 409
     
-    # Create user with both Google OAuth and password
     username = generate_username(full_name or email.split('@')[0])
     user = User(
         username=username,
@@ -672,24 +530,16 @@ def api_google_complete_signup():
         oauth_id=str(google_id) if google_id else None
     )
 
-    # Auto-promote Admin
     if email == app.config.get('ADMIN_EMAIL'):
         user.is_admin = True
-        print(f"[GOOGLE-COMPLETE] Auto-promoting {email} to Admin on Creation")
 
     user.set_password(password)
     db.session.add(user)
-    
-    # Delete verification code
-    db.session.delete(verification)
     db.session.commit()
     
-    # Login user
     login_user(user)
     user.last_login = datetime.utcnow()
     db.session.commit()
-    
-    print(f"[GOOGLE-COMPLETE-SIGNUP] New user created: {email} (username: {username})")
     
     return jsonify({
         'message': 'Account created successfully',
@@ -699,94 +549,99 @@ def api_google_complete_signup():
 
 
 
-@app.route('/api/request-password-reset', methods=['POST'])
-def api_request_password_reset():
-    """Send a reset code to the user's email."""
-    data = request.json or {}
-    email = (data.get('email') or '').strip().lower()
 
-    if not email:
-        return jsonify({'error': 'Email is required'}), 400
+# OTP AUTH DISABLED TEMPORARILY
+# @app.route('/api/request-password-reset', methods=['POST'])
+# def api_request_password_reset():
+#     """Send a reset code to the user's email."""
+#     data = request.json or {}
+#     email = (data.get('email') or '').strip().lower()
+# 
+#     if not email:
+#         return jsonify({'error': 'Email is required'}), 400
+# 
+#     user = User.query.filter_by(email=email).first()
+#     if not user:
+#         # Avoid leaking which emails exist
+#         return jsonify({'message': 'If an account exists, a reset code has been sent'}), 200
+# 
+#     if user.oauth_provider and not user.password_hash:
+#         return jsonify({'error': f"This account uses {user.oauth_provider.capitalize()} sign-in. Use that provider to sign in."}), 400
+# 
+#     # Remove existing reset codes for this email
+#     VerificationCode.query.filter_by(email=email, purpose='reset').delete()
+# 
+#     code = generate_verification_code()
+#     expires_at = datetime.utcnow() + timedelta(minutes=10)
+# 
+#     verification = VerificationCode(
+#         email=email,
+#         code=code,
+#         purpose='reset',
+#         expires_at=expires_at,
+#         temp_data=None,
+#     )
+#     db.session.add(verification)
+#     db.session.commit()
+# 
+#     if send_verification_email(email, code, 'reset'):
+#         return jsonify({'message': 'Reset code sent to your email', 'email': email}), 200
+#     
+#     return jsonify({'error': 'Failed to send reset email. Please check your email configuration.'}), 500
 
-    user = User.query.filter_by(email=email).first()
-    if not user:
-        # Avoid leaking which emails exist
-        return jsonify({'message': 'If an account exists, a reset code has been sent'}), 200
 
-    if user.oauth_provider and not user.password_hash:
-        return jsonify({'error': f"This account uses {user.oauth_provider.capitalize()} sign-in. Use that provider to sign in."}), 400
-
-    # Remove existing reset codes for this email
-    VerificationCode.query.filter_by(email=email, purpose='reset').delete()
-
-    code = generate_verification_code()
-    expires_at = datetime.utcnow() + timedelta(minutes=10)
-
-    verification = VerificationCode(
-        email=email,
-        code=code,
-        purpose='reset',
-        expires_at=expires_at,
-        temp_data=None,
-    )
-    db.session.add(verification)
-    db.session.commit()
-
-    if send_verification_email(email, code, 'reset'):
-        return jsonify({'message': 'Reset code sent to your email', 'email': email}), 200
-    
     return jsonify({'error': 'Failed to send reset email. Please check your email configuration.'}), 500
 
-    return jsonify({'error': 'Failed to send reset email. Please check your email configuration.'}), 500
 
+# OTP AUTH DISABLED TEMPORARILY
+# @app.route('/api/reset-password', methods=['POST'])
+# def api_reset_password():
+#     """Reset password after verifying the code."""
+#     data = request.json or {}
+#     email = (data.get('email') or '').strip().lower()
+#     code = (data.get('code') or '').strip()
+#     new_password = data.get('new_password') or data.get('password')
+# 
+#     if not email or not code or not new_password:
+#         return jsonify({'error': 'Email, code, and new password are required'}), 400
+# 
+#     if len(new_password) < 8:
+#         return jsonify({'error': 'Password must be at least 8 characters long'}), 400
+# 
+#     verification = VerificationCode.query.filter_by(
+#         email=email,
+#         code=code,
+#         purpose='reset'
+#     ).first()
+# 
+#     if not verification:
+#         return jsonify({'error': 'Invalid reset code'}), 400
+# 
+#     if verification.is_expired():
+#         db.session.delete(verification)
+#         db.session.commit()
+#         return jsonify({'error': 'Reset code has expired. Please request a new one.'}), 400
+# 
+#     user = User.query.filter_by(email=email).first()
+#     if not user:
+#         db.session.delete(verification)
+#         db.session.commit()
+#         return jsonify({'error': 'User not found'}), 404
+# 
+#     # Update password
+#     user.set_password(new_password)
+# 
+#     db.session.delete(verification)
+#     db.session.commit()
+# 
+#     login_user(user)
+# 
+#     return jsonify({
+#         'message': 'Password updated successfully',
+#         'user': serialize_user(user),
+#         'token': 'session'
+#     }), 200
 
-@app.route('/api/reset-password', methods=['POST'])
-def api_reset_password():
-    """Reset password after verifying the code."""
-    data = request.json or {}
-    email = (data.get('email') or '').strip().lower()
-    code = (data.get('code') or '').strip()
-    new_password = data.get('new_password') or data.get('password')
-
-    if not email or not code or not new_password:
-        return jsonify({'error': 'Email, code, and new password are required'}), 400
-
-    if len(new_password) < 8:
-        return jsonify({'error': 'Password must be at least 8 characters long'}), 400
-
-    verification = VerificationCode.query.filter_by(
-        email=email,
-        code=code,
-        purpose='reset'
-    ).first()
-
-    if not verification:
-        return jsonify({'error': 'Invalid reset code'}), 400
-
-    if verification.is_expired():
-        db.session.delete(verification)
-        db.session.commit()
-        return jsonify({'error': 'Reset code has expired. Please request a new one.'}), 400
-
-    user = User.query.filter_by(email=email).first()
-    if not user:
-        db.session.delete(verification)
-        db.session.commit()
-        return jsonify({'error': 'User not found'}), 404
-
-    # Update password
-    user.set_password(new_password)
-
-    db.session.delete(verification)
-    db.session.commit()
-
-    login_user(user)
-
-    return jsonify({
-        'message': 'Password updated successfully',
-        'user': serialize_user(user),
-        'token': 'session'
-    }), 200
 
 @app.route('/api/logout', methods=['POST'])
 @login_required

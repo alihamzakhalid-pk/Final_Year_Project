@@ -14,20 +14,19 @@ import { useToast } from '../components/ui/Toast'
 import api from '../api/axios'
 
 export default function Login() {
-  const { login, setUserDirect } = useAuth()
+  const { login, setUserDirect, signInWithGoogle, completeGoogleSignup } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const { showSuccess, showError } = useToast()
   const from = location.state?.from || '/dashboard'
 
-  // Steps: 'form' | 'google_password' | 'google_verify'
+  // Steps: 'form' | 'google_password'
   const [step, setStep] = useState('form')
   const [loading, setLoading] = useState(false)
 
   // Google OAuth state
-  const [googleEmail, setGoogleEmail] = useState('')
-  const [googleName, setGoogleName] = useState('')
+  const [googleData, setGoogleData] = useState(null)
   const [googlePassword, setGooglePassword] = useState('')
   const [googleConfirm, setGoogleConfirm] = useState('')
   const [passwordError, setPasswordError] = useState('')
@@ -46,48 +45,31 @@ export default function Login() {
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
       setLoading(true)
-      const token = credentialResponse.credential
+      const result = await signInWithGoogle(credentialResponse)
 
-      console.log('[OAUTH] Sending Google ID token to backend...')
-      const { data } = await api.post('/api/oauth/google/id-token', { token })
-
-      console.log('[OAUTH] Backend response:', { new_user: data?.new_user })
-
-      if (data?.new_user === true) {
-        // New user → show password setup step
-        console.log('[OAUTH] New user detected, showing password setup')
-        setGoogleEmail(data.email || '')
-        setGoogleName(data.name || '')
-        setStep('google_password')
-        showSuccess('Google account verified! Please set a password for your account.')
-        if (data?.devMode && data?.code) {
-          showSuccess(`Dev mode - Verification code: ${data.code}`)
-        }
-      } else {
-        // Existing user → logged in directly
-        console.log('[OAUTH] Existing user, redirecting to dashboard')
-        if (data?.user) {
-          setUserDirect(data.user)
-        }
+      if (result.user) {
         showSuccess('Logged in successfully!')
         setTimeout(() => {
           navigate('/dashboard', { replace: true })
         }, 500)
+      } else if (result.new_user) {
+        setGoogleData(result)
+        setStep('google_password')
+        showSuccess('Google account verified! Please set a password for your account.')
       }
     } catch (error) {
-      console.error('[OAUTH] Google login error:', error)
-      showError(error?.message || error?.data?.error || 'Google login failed')
+      console.error('[AUTH] Google login error:', error)
+      showError(error?.message || 'Google login failed')
     } finally {
       setLoading(false)
     }
   }
 
   const handleGoogleError = () => {
-    console.error('[OAUTH] Google login dismissed')
-    showError('Google login cancelled')
+    showError('Google login failed')
   }
 
-  const handlePasswordSubmit = (e) => {
+  const handleGooglePasswordSubmit = async (e) => {
     e.preventDefault()
     setPasswordError('')
 
@@ -100,29 +82,24 @@ export default function Login() {
       return
     }
 
-    // Move to verification code step
-    setStep('google_verify')
-    showSuccess('Now enter the verification code sent to your email.')
-  }
-
-  const handleVerifyComplete = async (code) => {
     try {
       setLoading(true)
-      const { data } = await api.post('/api/oauth/google/complete-signup', {
-        email: googleEmail,
-        code: code.trim(),
-        password: googlePassword
+      const data = await completeGoogleSignup({
+        email: googleData.email,
+        name: googleData.name,
+        password: googlePassword,
+        code: googleData.code, // BYPASS_OTP
+        google_id: googleData.google_id
       })
+
       if (data?.user) {
-        setUserDirect(data.user)
-        showSuccess('Account created successfully! Redirecting to dashboard...')
+        showSuccess('Account created successfully!')
         setTimeout(() => {
           navigate('/dashboard', { replace: true })
-        }, 800)
+        }, 500)
       }
     } catch (error) {
-      console.error('[OAUTH] Verification error:', error)
-      showError(error?.message || error?.data?.error || 'Invalid verification code. Please try again.')
+      showError(error?.response?.data?.error || error?.message || 'Failed to complete signup')
     } finally {
       setLoading(false)
     }
@@ -147,36 +124,32 @@ export default function Login() {
               Welcome back
             </motion.h1>
             <p className="text-sm text-[#6B7280] dark:text-slate-400">
-              Enter your credentials to access your conversations and dashboards.
+              Sign in to access your conversations.
             </p>
           </div>
 
-          {/* ====== STEP: FORM (default login) ====== */}
+          {/* ====== STEP: FORM (Manual + Google) ====== */}
           {step === 'form' && (
-            <>
-              {/* Google OAuth Button */}
-              <div className="mb-6">
-                <div className="flex justify-center">
-                  <GoogleLogin
-                    onSuccess={handleGoogleSuccess}
-                    onError={handleGoogleError}
-                    text="signin_with"
-                    logo_alignment="center"
-                  />
-                </div>
+            <div className="space-y-6">
+              <div className="flex justify-center">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  text="continue_with"
+                  logo_alignment="center"
+                  width="100%"
+                />
               </div>
 
-              {/* Divider */}
-              <div className="relative mb-6">
+              <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200" />
+                  <div className="w-full border-t border-slate-200 dark:border-slate-700" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white dark:bg-slate-800 px-2 text-[#6B7280] dark:text-slate-400">OR</span>
+                  <span className="bg-white dark:bg-slate-800 px-2 text-slate-500">OR</span>
                 </div>
               </div>
 
-              {/* Email Login Form */}
               <AuthForm
                 mode="login"
                 onSubmit={async ({ email, password, identifier }) => {
@@ -186,8 +159,6 @@ export default function Login() {
                     if (data?.user) {
                       showSuccess('Logged in successfully!')
                       navigate(from, { replace: true })
-                    } else {
-                      showError('Login failed. Unexpected response from server.')
                     }
                   } catch (error) {
                     showError(error?.response?.data?.error || error?.message || 'Login failed')
@@ -197,29 +168,25 @@ export default function Login() {
                 }}
                 disabled={loading}
               />
-            </>
+            </div>
           )}
 
-          {/* ====== STEP: GOOGLE PASSWORD SETUP (new users) ====== */}
+          {/* ====== STEP: GOOGLE PASSWORD SETUP ====== */}
           {step === 'google_password' && (
             <div className="space-y-6">
               <div className="text-center space-y-2">
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#E8F0FF] dark:bg-slate-700 mb-4"
-                >
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#E8F0FF] dark:bg-slate-700 mb-4">
                   <Lock className="h-8 w-8 text-[#5B7FFF]" />
-                </motion.div>
+                </div>
                 <h2 className="text-2xl font-bold text-[#1F2937] dark:text-slate-100">Set your password</h2>
                 <p className="text-sm text-[#6B7280] dark:text-slate-400">
-                  Welcome, <span className="font-semibold text-[#1F2937] dark:text-slate-200">{googleName || googleEmail}</span>!
+                  Welcome, <span className="font-semibold">{googleData?.name || googleData?.email}</span>!
                   <br />
                   Create a password for your BotMe account.
                 </p>
               </div>
 
-              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <form onSubmit={handleGooglePasswordSubmit} className="space-y-4">
                 <UIInputField
                   label="Password"
                   type="password"
@@ -229,12 +196,9 @@ export default function Login() {
                     setPasswordError('')
                   }}
                   placeholder="••••••••"
-                  autoComplete="new-password"
                   required
                   icon={<Lock className="h-5 w-5 text-slate-400" />}
                 />
-                {googlePassword && <PasswordStrength password={googlePassword} />}
-
                 <UIInputField
                   label="Confirm password"
                   type="password"
@@ -243,87 +207,21 @@ export default function Login() {
                     setGoogleConfirm(e.target.value)
                     setPasswordError('')
                   }}
-                  placeholder="Repeat your password"
-                  autoComplete="new-password"
+                  placeholder="••••••••"
                   required
                   icon={<ShieldCheck className="h-5 w-5 text-slate-400" />}
                 />
 
                 {passwordError && (
-                  <motion.div
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 px-4 py-3 text-sm text-red-700 dark:text-red-300"
-                  >
+                  <div className="text-sm text-red-500 bg-red-50 dark:bg-red-500/10 p-3 rounded-lg border border-red-200">
                     {passwordError}
-                  </motion.div>
+                  </div>
                 )}
 
-                <UIButton
-                  type="submit"
-                  variant="primary"
-                  size="lg"
-                  className="w-full mt-2"
-                  disabled={loading}
-                >
-                  Continue
+                <UIButton type="submit" variant="primary" size="lg" className="w-full" disabled={loading}>
+                  {loading ? 'Setting up...' : 'Continue to Dashboard'}
                 </UIButton>
               </form>
-
-              <div className="text-center">
-                <button
-                  onClick={() => {
-                    setStep('form')
-                    setGooglePassword('')
-                    setGoogleConfirm('')
-                    setPasswordError('')
-                  }}
-                  className="text-sm text-[#6B7280] dark:text-slate-400 hover:text-[#5B7FFF]"
-                  disabled={loading}
-                >
-                  Back to login
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ====== STEP: GOOGLE VERIFY (enter email code) ====== */}
-          {step === 'google_verify' && (
-            <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#E8F0FF] dark:bg-slate-700 mb-4"
-                >
-                  <Mail className="h-8 w-8 text-[#5B7FFF]" />
-                </motion.div>
-                <h2 className="text-2xl font-bold text-[#1F2937] dark:text-slate-100">Verify your email</h2>
-                <p className="text-sm text-[#6B7280] dark:text-slate-400">
-                  We've sent a 6-digit code to
-                  <br />
-                  <span className="font-semibold text-[#1F2937] dark:text-slate-200">{googleEmail}</span>
-                </p>
-              </div>
-
-              <VerificationCodeInput
-                length={6}
-                onComplete={handleVerifyComplete}
-                disabled={loading}
-              />
-
-              <div className="text-center space-y-3">
-                <button
-                  onClick={() => setStep('google_password')}
-                  className="mx-auto text-sm text-[#6B7280] dark:text-slate-400 hover:text-[#5B7FFF]"
-                  disabled={loading}
-                >
-                  Back to password setup
-                </button>
-                <p className="text-xs text-[#6B7280] dark:text-slate-400">
-                  Didn't receive the code? Check your spam folder.
-                </p>
-              </div>
             </div>
           )}
 
@@ -333,7 +231,7 @@ export default function Login() {
               to="/signup"
               className="font-semibold text-[#5B7FFF] hover:text-[#4A6BFF] transition-colors"
             >
-              Create an account
+              Get Started
             </Link>
           </p>
         </UICard>

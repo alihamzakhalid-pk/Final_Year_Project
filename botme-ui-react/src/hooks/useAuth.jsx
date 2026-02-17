@@ -54,17 +54,17 @@ export function AuthProvider({ children }) {
 
   const signup = async ({ fullName, email, password }) => {
     const { data } = await api.post('/api/signup', { fullName, email, password })
+    if (data?.user) {
+      const token = data?.token || 'session'
+      localStorage.setItem('auth_token', token)
+      setUser(data.user)
+    }
     return data
   }
 
   const verifySignup = async ({ email, code }) => {
-    const { data } = await api.post('/api/verify-signup', { email, code })
-    const token = data?.token || data?.accessToken || 'demo-auth-token'
-    localStorage.setItem('auth_token', token)
-    if (data?.user) {
-      setUser(data.user)
-    }
-    return data
+    // DEPRECATED but kept for compatibility
+    return { success: true }
   }
 
   const logout = async () => {
@@ -73,7 +73,7 @@ export function AuthProvider({ children }) {
     try {
       await api.post('/api/logout') // Optional: notify backend about logout when available
     } catch (error) {
-      // Ignore placeholder errors until backend wiring exists
+      // Ignore
     }
   }
 
@@ -117,6 +117,44 @@ export function AuthProvider({ children }) {
     window.location.href = `${baseURL}/api/oauth/${provider}/login`
   }
 
+  const signInWithGoogle = async (credentialResponse) => {
+    try {
+      const token = credentialResponse.credential
+      const { data } = await api.post('/api/oauth/google/id-token', { token })
+
+      if (data?.user) {
+        setUserDirect(data.user)
+        return { user: data.user }
+      } else if (data?.new_user) {
+        return {
+          new_user: true,
+          email: data.email,
+          name: data.name,
+          google_id: data.google_id,
+          code: data.code // BYPASS_OTP from backend
+        }
+      }
+    } catch (error) {
+      console.error('[AUTH] Google Sign-in Error:', error)
+      throw error
+    }
+  }
+
+  const completeGoogleSignup = async ({ email, password, name, code, google_id }) => {
+    const { data } = await api.post('/api/oauth/google/complete-signup', {
+      email,
+      password,
+      name,
+      code,
+      google_id
+    })
+    if (data?.user) {
+      setUserDirect(data.user)
+    }
+    return data
+  }
+
+
   const value = useMemo(
     () => ({
       user,
@@ -130,9 +168,13 @@ export function AuthProvider({ children }) {
       setUserDirect,
       requestPasswordReset,
       resetPassword,
+      signInWithGoogle,
+      completeGoogleSignup,
     }),
     [user, loading],
   )
+
+
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

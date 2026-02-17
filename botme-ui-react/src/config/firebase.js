@@ -1,6 +1,6 @@
 // Firebase configuration for React
 import { initializeApp } from 'firebase/app'
-import { getAuth, signInWithEmailLink, isSignInWithEmailLink, sendSignInLinkToEmail } from 'firebase/auth'
+import { getAuth, signInWithEmailLink, isSignInWithEmailLink, sendSignInLinkToEmail, GoogleAuthProvider } from 'firebase/auth'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -14,8 +14,10 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig)
 const auth = getAuth(app)
+const googleProvider = new GoogleAuthProvider()
 
 // Configure auth persistence
 auth.setPersistence('LOCAL')
 
-export { auth, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink }
+export { auth, googleProvider, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink }
+
