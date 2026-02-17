@@ -12,7 +12,11 @@ if os.path.exists('env'):
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-change-in-prod'
     ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL') or 'alihamzakhalid.pk@gmail.com'
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///botme.db'
+    # Prefer DATABASE_URL from Render (Postgres), fallback to SQLite
+    db_url = os.environ.get('DATABASE_URL')
+    if db_url and db_url.startswith('postgres://'):
+        db_url = db_url.replace('postgres://', 'postgresql://', 1)
+    SQLALCHEMY_DATABASE_URI = db_url or 'sqlite:///botme.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
     # GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')

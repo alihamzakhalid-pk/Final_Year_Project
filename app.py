@@ -19,6 +19,9 @@ from oauth_handler import get_oauth_auth_url, exchange_oauth_code, get_or_create
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
+# Global request object to cache Google certificates for much faster login
+GOOGLE_REQUEST = google_requests.Request()
+
 from rag_chatbot import (
     get_chatbot_response_rag,  # NEW RAG SYSTEM
     create_vector_store,
@@ -417,7 +420,7 @@ def api_google_id_token():
         
         idinfo = id_token.verify_oauth2_token(
             token,
-            google_requests.Request(),
+            GOOGLE_REQUEST,  # Use cached certificates
             client_id
         )
         
@@ -442,21 +445,24 @@ def api_google_id_token():
     
     if user:
         # ---- EXISTING USER: log in directly ----
+        needs_commit = False
         if not user.oauth_provider:
             # Link Google to existing email account
             user.oauth_provider = 'google'
             user.oauth_id = str(google_id)
-            db.session.commit()
+            needs_commit = True
         
         # Auto-promote Admin on Google Login if needed
         if user.email == app.config.get('ADMIN_EMAIL') and not user.is_admin:
             user.is_admin = True
-            db.session.commit()
+            needs_commit = True
             print(f"[GOOGLE-ID-TOKEN] Auto-promoting existing user {user.email} to Admin")
 
         login_user(user)
         user.last_login = datetime.utcnow()
-        db.session.commit()
+        
+        if needs_commit or True: # Always commit last_login
+            db.session.commit()
         
         print(f"[GOOGLE-ID-TOKEN] Existing user logged in: {user.email}")
         return jsonify({
@@ -1662,5 +1668,7 @@ def debug_test_email(email):
         }), 200  # Return 200 so browser shows the JSON
 
 if __name__ == '__main__':
-    # Bind explicitly to 127.0.0.1:5000 to match Vite proxy default
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    # Local development: bind to 127.0.0.1:5000
+    # In production (Render), Gunicorn handles the binding via render.yaml
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
