@@ -42,7 +42,7 @@ else:
 is_production = os.environ.get('FLASK_ENV') == 'production' or os.environ.get('RENDER') is not None
 app.config['SESSION_COOKIE_SECURE'] = is_production  # HTTPS only in production
 app.config['SESSION_COOKIE_HTTPONLY'] = True  # No JavaScript access
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
+app.config['SESSION_COOKIE_SAMESITE'] = 'None' if is_production else 'Lax'  # None allows cross-site cookies in prod
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)  # 1 hour expiry
 app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Reset timer on each request
 
@@ -1355,26 +1355,50 @@ def oauth_verify_signup():
 @app.route('/api/user/openai-key', methods=['POST'])
 @login_required
 def set_openai_key():
-    """Store user's OpenAI API key in session (expires after 1 hour)"""
+    """Store and VERIFY user's OpenAI API key in session"""
     data = request.json or {}
     api_key = data.get('api_key', '').strip()
     
     if not api_key:
-        print("[API_KEY] Error: API key required")
         return jsonify({'error': 'API key required'}), 400
     
-    # Basic validation (just length check)
-    if len(api_key) < 20:
-        print(f"[API_KEY] Warning: Short API key provided: {len(api_key)} chars")
-        # Proceed anyway - let OpenAI reject it if invalid
-    
-    # Store in server session (not database, not client-side)
+    # --- VERIFICATION STEP ---
+    print(f"[API_KEY] Verifying key for user {current_user.username}...")
+    try:
+        # We'll use a simple models list request to verify the key
+        # We use requests directly to avoid initializing a full OpenAI client just for this
+        response = requests.get(
+            "https://api.openai.com/v1/models",
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            error_msg = "Invalid OpenAI API key. Please check the key and try again."
+            if response.status_code == 401:
+                error_msg = "The OpenAI API key provided is invalid or inactive."
+            elif response.status_code == 429:
+                 print("[API_KEY] Warning: Rate limited or quota exceeded during check")
+                 # We allow 429 because the key might be valid but out of funds
+            else:
+                return jsonify({'error': error_msg, 'details': response.text}), response.status_code
+            
+            if response.status_code == 401:
+                return jsonify({'error': error_msg}), 401
+
+    except Exception as e:
+        print(f"[API_KEY] Verification request failed: {e}")
+        # If the network request fails, we might still want to save it and let 
+        # actual chat attempts fail later, but for now we warn:
+        return jsonify({'error': f"Could not verify key: {str(e)}"}), 500
+
+    # Store in server session
     session['openai_api_key'] = api_key
     session.permanent = True
-    session.modified = True  # Force Flask to save the session
-    print(f"[API_KEY] API key saved to session for user {current_user.username}")
+    session.modified = True
+    print(f"[API_KEY] Verified key saved to session for user {current_user.username}")
     
-    return jsonify({'message': 'API key stored securely in session'}), 200
+    return jsonify({'message': 'API key verified and stored securely in session'}), 200
 
 
 @app.route('/api/user/openai-key', methods=['GET'])
