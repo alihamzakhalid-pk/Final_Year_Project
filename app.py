@@ -1,17 +1,20 @@
 from flask import Flask, request, redirect, url_for, flash, jsonify, session
+from sqlalchemy import func
 import re
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_mail import Mail, Message
 from werkzeug.utils import secure_filename
 from config import Config
-from models import db, User, ChatData, VerificationCode
+from models import db, User, ChatData, VerificationCode, VoiceSample, GeneratedAudio
+from elevenlabs_client import ElevenLabsClient
 import os
 import json
 import random
 import string
 import requests
 import urllib.parse
+import hashlib
 from parse_chat import parse_chat_file
 from personality_analysis import analyze_personality
 from datetime import datetime, timedelta
@@ -46,7 +49,9 @@ is_production = os.environ.get('FLASK_ENV') == 'production' or os.environ.get('R
 app.config['SESSION_COOKIE_SECURE'] = is_production  # HTTPS only in production
 app.config['SESSION_COOKIE_HTTPONLY'] = True  # No JavaScript access
 app.config['SESSION_COOKIE_SAMESITE'] = 'None' if is_production else 'Lax'  # None allows cross-site cookies in prod
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)  # 1 hour expiry
+app.config['REMEMBER_COOKIE_SECURE'] = is_production
+app.config['REMEMBER_COOKIE_SAMESITE'] = 'None' if is_production else 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)  # Extend session life
 app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Reset timer on each request
 
 # Enable CORS for SPA
@@ -438,10 +443,11 @@ def api_google_id_token():
         print(f"[GOOGLE-ID-TOKEN] Unexpected error verifying token: {e}")
         return jsonify({'error': 'Failed to verify Google token'}), 500
     
-    # Check if user already exists (by oauth_id OR by email)
+    # Check if user already exists (by oauth_id OR by email case-insensitively)
     user = User.query.filter_by(oauth_provider='google', oauth_id=str(google_id)).first()
     if not user:
-        user = User.query.filter_by(email=google_email).first()
+        # Use func.lower for robust email matching across different providers/cases
+        user = User.query.filter(func.lower(User.email) == google_email.lower()).first()
     
     if user:
         # ---- EXISTING USER: log in directly ----
@@ -1666,6 +1672,219 @@ def debug_test_email(email):
             'traceback': error_trace,
             'config': config_check
         }), 200  # Return 200 so browser shows the JSON
+
+# ==================== VOICE & TTS ENDPOINTS ====================
+
+@app.route('/api/voice/upload', methods=['POST'])
+@login_required
+def api_voice_upload():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    
+    file = request.files['file']
+    persona_name = request.form.get('persona_name', 'Unknown')
+    
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+        
+    if file:
+        # Check Allowed extensions from Config
+        # secure_filename returns just the name, we need extension
+        original_filename = file.filename
+        if '.' not in original_filename:
+             return jsonify({'error': 'No file extension'}), 400
+             
+        ext = original_filename.rsplit('.', 1)[1].lower()
+        if ext not in Config.ALLOWED_AUDIO_EXTENSIONS:
+             return jsonify({'error': 'Invalid file type'}), 400
+
+        filename = secure_filename(f"voice_{current_user.id}_{int(datetime.utcnow().timestamp())}.{ext}")
+        
+        # Determine paths
+        voice_uploads_dir = os.path.join(Config.UPLOAD_FOLDER, 'voice_samples')
+        os.makedirs(voice_uploads_dir, exist_ok=True)
+        
+        file_path = os.path.join(voice_uploads_dir, filename)
+        
+        try:
+            # 1. Save file locally
+            file_path = os.path.abspath(file_path)
+            file.save(file_path)
+            
+            file_size = os.path.getsize(file_path)
+            print(f"[VOICE-CLONE] Saved file to absolute path: {file_path} ({file_size} bytes)")
+            
+            # 2. Clone voice via ElevenLabs
+            client = ElevenLabsClient()
+            try:
+                print(f"[VOICE-CLONE] Starting ElevenLabs cloning for persona: {persona_name}")
+                voice_data = client.clone_voice(
+                    name=f"{persona_name} (User {current_user.id})",
+                    description=f"Cloned voice for persona {persona_name}",
+                    audio_files=[file_path]
+                )
+                print(f"[VOICE-CLONE] Successfully cloned voice: {voice_data.get('voice_id')}")
+            except Exception as e:
+                # If cloning fails, clean up the file
+                print(f"[VOICE-CLONE ERROR] ElevenLabs cloning failed: {str(e)}")
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                raise e
+            
+            # 3. Save to Database
+            voice_sample = VoiceSample(
+                user_id=current_user.id,
+                persona_name=persona_name,
+                elevenlabs_voice_id=voice_data['voice_id'],
+                voice_name=voice_data['name'],
+                audio_file_path=file_path
+            )
+            db.session.add(voice_sample)
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'Voice cloned successfully',
+                'voice_sample': {
+                    'id': voice_sample.id,
+                    'name': voice_sample.voice_name,
+                    'persona': voice_sample.persona_name
+                }
+            }), 201
+            
+        except Exception as e:
+            print(f"Voice upload failed: {e}")
+            return jsonify({'error': str(e)}), 500
+            
+    return jsonify({'error': 'File not allowed'}), 400
+
+@app.route('/api/voice/samples', methods=['GET'])
+@login_required
+def api_get_voice_samples():
+    samples = VoiceSample.query.filter_by(user_id=current_user.id, is_active=True).all()
+    return jsonify({
+        'samples': [
+            {
+                'id': s.id,
+                'persona_name': s.persona_name,
+                'voice_name': s.voice_name,
+                'created_at': s.created_at.isoformat()
+            }
+            for s in samples
+        ]
+    })
+
+@app.route('/api/voice/samples/<int:sample_id>', methods=['DELETE'])
+@login_required
+def api_delete_voice_sample(sample_id):
+    sample = VoiceSample.query.filter_by(id=sample_id, user_id=current_user.id).first_or_404()
+    
+    try:
+        # 1. Delete from ElevenLabs
+        client = ElevenLabsClient()
+        try:
+            client.delete_voice(sample.elevenlabs_voice_id)
+        except Exception as e:
+            print(f"Warning: Failed to delete from ElevenLabs: {e}")
+            
+        # 2. Delete from DB (soft delete or hard delete)
+        # Soft delete is safer
+        sample.is_active = False
+        db.session.commit()
+        
+        return jsonify({'message': 'Voice sample deleted'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tts/generate', methods=['POST'])
+@login_required
+def api_generate_tts():
+    data = request.json
+    text = data.get('text')
+    voice_sample_id = data.get('voice_sample_id')
+    
+    if not text or not voice_sample_id:
+        return jsonify({'error': 'Missing text or voice_sample_id'}), 400
+        
+    # 1. Check Cache
+    # Create hash of (text + voice_id) to uniquely identify this audio
+    message_hash = hashlib.sha256(f"{text}_{voice_sample_id}".encode()).hexdigest()
+    
+    cached_audio = GeneratedAudio.query.filter_by(message_hash=message_hash).first()
+    if cached_audio:
+        # Validate file exists
+        if os.path.exists(cached_audio.audio_file_path):
+            cached_audio.last_accessed = datetime.utcnow()
+            db.session.commit()
+            return jsonify({
+                'audio_url': f"/api/audio/{cached_audio.id}",
+                'cached': True
+            })
+        else:
+            # Clean up dead record
+            db.session.delete(cached_audio)
+            db.session.commit()
+            
+    # 2. Get Voice ID
+    voice_sample = VoiceSample.query.filter_by(id=voice_sample_id).first()
+    if not voice_sample:
+        return jsonify({'error': 'Voice sample not found'}), 404
+    
+    try:
+        # 3. Generate Audio via ElevenLabs
+        client = ElevenLabsClient()
+        audio_bytes = client.generate_tts(
+            text=text,
+            voice_id=voice_sample.elevenlabs_voice_id
+        )
+        
+        # 4. Save to Disk
+        os.makedirs(Config.GENERATED_AUDIO_FOLDER, exist_ok=True)
+        filename = f"tts_{message_hash[:16]}.mp3"
+        file_path = os.path.join(Config.GENERATED_AUDIO_FOLDER, filename)
+        
+        with open(file_path, 'wb') as f:
+            f.write(audio_bytes)
+            
+        # 5. Save to DB Cache
+        new_cache = GeneratedAudio(
+            message_hash=message_hash,
+            voice_sample_id=voice_sample.id,
+            audio_file_path=file_path
+        )
+        db.session.add(new_cache)
+        db.session.commit()
+        
+        return jsonify({
+            'audio_url': f"/api/audio/{new_cache.id}",
+            'cached': False
+        })
+        
+    except Exception as e:
+        print(f"TTS Generation failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/audio/<int:audio_id>', methods=['GET'])
+@login_required
+def api_serve_audio(audio_id):
+    """Serve generated audio file"""
+    # Fix for NameError:
+    from flask import send_file
+    
+    try:
+        audio = GeneratedAudio.query.get_or_404(audio_id)
+        
+        # Ensure absolute path for safety
+        abs_path = os.path.abspath(audio.audio_file_path)
+        
+        if not os.path.exists(abs_path):
+            print(f"[SERVE_AUDIO] File missing at: {abs_path}")
+            return jsonify({'error': f'Audio file missing at server path: {abs_path}'}), 404
+            
+        return send_file(abs_path, mimetype='audio/mpeg')
+    except Exception as e:
+        print(f"[SERVE_AUDIO] Error serving file: {e}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Local development: bind to 127.0.0.1:5000

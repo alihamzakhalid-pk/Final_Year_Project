@@ -48,7 +48,12 @@ class ElevenLabsClient:
                 'category': voice.category,
             }
         except Exception as e:
-            raise Exception(f"Failed to clone voice: {str(e)}")
+            error_msg = str(e)
+            if "quota" in error_msg.lower():
+                raise Exception("ElevenLabs quota exceeded. Please check your plan limits.")
+            if "invalid api key" in error_msg.lower():
+                raise Exception("Invalid ElevenLabs API Key. Please check your Render environment variables.")
+            raise Exception(f"ElevenLabs cloning error: {error_msg}")
 
     def generate_tts(self, text: str, voice_id: str) -> bytes:
         """
