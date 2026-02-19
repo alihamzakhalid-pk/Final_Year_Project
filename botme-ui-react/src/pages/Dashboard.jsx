@@ -274,6 +274,7 @@ export default function Dashboard() {
 
                   {/* Right Actions */}
                   <div className="flex items-center gap-2">
+                    {/* Personality Analysis - temporarily disabled
                     <UIButton
                       onClick={(e) => {
                         e.stopPropagation()
@@ -284,6 +285,7 @@ export default function Dashboard() {
                       <Brain className="h-4 w-4" />
                       Analyze
                     </UIButton>
+                    */}
                     <UIButton
                       onClick={(e) => {
                         e.stopPropagation()

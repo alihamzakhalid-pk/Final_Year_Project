@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Search, Download, Settings, Upload, MessageSquare, Trash2, Brain, Volume2 } from 'lucide-react'
+import { Search, Download, Settings, Upload, MessageSquare, Trash2, Brain, Volume2, Mic } from 'lucide-react'
 import ChatWindow from '../components/ChatWindow'
 import MessageInput from '../components/MessageInput'
 import UICard from '../components/ui/Card'
@@ -46,6 +46,9 @@ export default function Chat() {
     // Load from local storage if available for this chat
     return localStorage.getItem(`voice_for_chat_${chatId}`) || null
   })
+
+  // Voice Mode State — when ON, bot responses come as audio-only voice notes
+  const [voiceMode, setVoiceMode] = useState(false)
 
   const { showSuccess, showError } = useToast()
 
@@ -278,16 +281,36 @@ export default function Chat() {
 
     setMessages((prev) => [...prev, userMessage])
     setTyping(true)
-    setStatus('Generating reply…')
+    setStatus(voiceMode ? 'Generating voice reply…' : 'Generating reply…')
     setError('')
 
     try {
       const { data } = await api.post(`/api/chat/${chatId}/rag`, { message: trimmed })
+      const replyText = data?.response || `I'm having trouble responding right now, lekin main ${selectedPerson || 'bot'} jaldi reply karega.`
+
+      // If Voice Mode is ON and a voice is selected, auto-generate TTS
+      let audioUrl = null
+      if (voiceMode && selectedVoiceId) {
+        setStatus('Generating voice…')
+        try {
+          const ttsResponse = await api.post('/api/tts/generate', {
+            text: replyText,
+            voice_sample_id: selectedVoiceId
+          })
+          audioUrl = ttsResponse.data?.audio_url || null
+        } catch (ttsErr) {
+          console.error('Voice Mode TTS failed, falling back to text:', ttsErr)
+          // Don't block the message — just show text if TTS fails
+        }
+      }
+
       const assistantReply = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: data?.response || `I'm having trouble responding right now, lekin main ${selectedPerson || 'bot'} jaldi reply karega.`,
+        content: replyText,
         timestamp: Date.now(),
+        isVoiceNote: voiceMode && selectedVoiceId && audioUrl !== null,
+        audioUrl: audioUrl,
       }
       setMessages((prev) => [...prev, assistantReply])
 
@@ -572,6 +595,32 @@ export default function Chat() {
               </button>
             </Tooltip>
 
+            {/* Voice Mode Toggle */}
+            {selectedVoiceId && (
+              <Tooltip content={voiceMode ? 'Voice Mode ON — click to disable' : 'Voice Mode OFF — click to enable'}>
+                <button
+                  onClick={() => {
+                    setVoiceMode(!voiceMode)
+                    if (!voiceMode) showSuccess('Voice Mode enabled')
+                  }}
+                  className={`relative rounded-lg p-2 transition-all duration-300 ${voiceMode
+                    ? 'text-white bg-[#5B7FFF] shadow-md shadow-[#5B7FFF]/30'
+                    : 'text-[#6B7280] hover:bg-[#F9FAFB] hover:text-[#5B7FFF]'
+                    }`}
+                  aria-label={voiceMode ? 'Disable Voice Mode' : 'Enable Voice Mode'}
+                >
+                  <Mic className="h-5 w-5" />
+                  {voiceMode && (
+                    <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#93B4FF] opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#5B7FFF]" />
+                    </span>
+                  )}
+                </button>
+              </Tooltip>
+            )}
+
+            {/* Personality Analysis - temporarily disabled
             {selectedPerson && (
               <UIButton
                 onClick={() => navigate(`/personality/${chatId}`, { state: { personName: selectedPerson, chatId } })}
@@ -581,6 +630,7 @@ export default function Chat() {
                 Personality Analysis
               </UIButton>
             )}
+            */}
             <button
               onClick={handleExport}
               className="rounded-lg p-2 text-[#6B7280] hover:bg-[#F9FAFB] hover:text-[#5B7FFF] transition-colors"
@@ -645,6 +695,7 @@ export default function Chat() {
                 typing={typing}
                 personaName={selectedPerson || 'AI'}
                 selectedVoiceId={selectedVoiceId}
+                voiceMode={voiceMode}
               />
             </ErrorBoundary>
           )}
@@ -655,6 +706,16 @@ export default function Chat() {
           <MessageInput
             onSend={handleSend}
             disabled={typing || !selectedPerson || (loading && !selectedPerson)}
+            voiceMode={voiceMode}
+            voiceEnabled={!!selectedVoiceId}
+            onToggleVoiceMode={() => {
+              if (!selectedVoiceId) {
+                showError('Select a voice first using the speaker icon')
+                return
+              }
+              setVoiceMode(!voiceMode)
+              if (!voiceMode) showSuccess('Voice Mode enabled')
+            }}
           />
         </div>
       </div>

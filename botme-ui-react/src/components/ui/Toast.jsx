@@ -33,7 +33,7 @@ const toastVariants = {
   },
 }
 
-export default function Toast({ id, message, variant = 'info', duration = 5000, onClose }) {
+export default function Toast({ id, message, variant = 'info', duration = 2000, onClose }) {
   const [progress, setProgress] = useState(100)
   const variantStyles = toastVariants[variant] || toastVariants.info
   const Icon = variantStyles.icon
@@ -64,32 +64,20 @@ export default function Toast({ id, message, variant = 'info', duration = 5000, 
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 300, scale: 0.95 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      exit={{ opacity: 0, x: 300, scale: 0.95 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className={`relative flex items-start gap-3 rounded-lg border ${variantStyles.border} ${variantStyles.bg} p-4 shadow-lg min-w-[320px] max-w-md`}
+      initial={{ opacity: 0, y: -20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -20, scale: 0.95 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className={`relative flex items-center gap-3 rounded-lg border ${variantStyles.border} ${variantStyles.bg} px-4 py-3 shadow-lg min-w-[280px] max-w-sm`}
     >
-      <Icon className={`h-5 w-5 ${variantStyles.iconColor} flex-shrink-0 mt-0.5`} />
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium ${variantStyles.text}`}>{message}</p>
-        {duration > 0 && (
-          <div className="mt-2 h-1 w-full bg-black/5 dark:bg-white/10 rounded-full overflow-hidden">
-            <motion.div
-              className={`h-full ${variantStyles.iconColor.replace('text-', 'bg-')}`}
-              initial={{ width: '100%' }}
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.1, ease: 'linear' }}
-            />
-          </div>
-        )}
-      </div>
+      <Icon className={`h-5 w-5 ${variantStyles.iconColor} flex-shrink-0`} />
+      <p className={`text-sm font-medium ${variantStyles.text} flex-1 min-w-0`}>{message}</p>
       <button
         onClick={onClose}
         className={`flex-shrink-0 rounded-md p-1 ${variantStyles.text} hover:bg-black/5 dark:hover:bg-white/10 transition-colors`}
         aria-label="Close notification"
       >
-        <X className="h-4 w-4" />
+        <X className="h-3.5 w-3.5" />
       </button>
     </motion.div>
   )
@@ -99,7 +87,7 @@ export default function Toast({ id, message, variant = 'info', duration = 5000, 
 export function ToastContainer({ toasts, removeToast }) {
   return (
     <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
-      <AnimatePresence>
+      <AnimatePresence mode="popLayout">
         {toasts.map((toast) => (
           <div key={toast.id} className="pointer-events-auto">
             <Toast {...toast} onClose={() => removeToast(toast.id)} />
@@ -116,7 +104,7 @@ const ToastContext = createContext(null)
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
 
-  const addToast = useCallback((message, variant = 'info', duration = 5000) => {
+  const addToast = useCallback((message, variant = 'info', duration = 2000) => {
     const id = Date.now() + Math.random()
     setToasts((prev) => [...prev, { id, message, variant, duration }])
     return id

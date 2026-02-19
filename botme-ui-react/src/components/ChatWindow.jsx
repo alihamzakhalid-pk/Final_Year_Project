@@ -6,6 +6,7 @@ import Avatar from './Avatar'
 import Tooltip from './ui/Tooltip'
 import { useToast } from './ui/Toast'
 import AudioPlayer from './AudioPlayer'
+import VoiceNoteBubble from './VoiceNoteBubble'
 
 const formatTime = (timestamp) => {
   const date = new Date(timestamp)
@@ -22,7 +23,7 @@ const formatTime = (timestamp) => {
   return date.toLocaleDateString()
 }
 
-export default function ChatWindow({ messages = [], typing = false, personaName = '', selectedVoiceId = null }) {
+export default function ChatWindow({ messages = [], typing = false, personaName = '', selectedVoiceId = null, voiceMode = false }) {
   const scrollRef = useRef(null)
   const { showSuccess } = useToast()
   const [copiedId, setCopiedId] = useState(null)
@@ -84,20 +85,24 @@ export default function ChatWindow({ messages = [], typing = false, personaName 
                   <div
                     className={`relative ${isUser
                       ? 'rounded-2xl rounded-tr-sm bg-gradient-to-br from-[#5B7FFF] to-[#7C3AED] text-white shadow-lg shadow-blue-500/20'
-                      : 'rounded-2xl rounded-tl-sm border border-[#E5E7EB] bg-white text-[#1F2937] shadow-md'
-                      } px-4 py-3 group-hover:shadow-lg transition-all duration-200`}
+                      : message.isVoiceNote
+                        ? 'bg-transparent'
+                        : 'rounded-2xl rounded-tl-sm border border-[#E5E7EB] bg-white text-[#1F2937] shadow-md'
+                      } ${message.isVoiceNote ? '' : 'px-4 py-3'} group-hover:shadow-lg transition-all duration-200`}
                   >
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{String(message.content || '')}</p>
-
-                    {/* Audio Player for Assistant */}
-                    {!isUser && selectedVoiceId && (
-                      <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                        <AudioPlayer
-                          text={String(message.content || '')}
-                          voiceId={selectedVoiceId}
-                          messageId={message.id}
-                        />
-                      </div>
+                    {/* Voice Note Bubble for voice messages */}
+                    {!isUser && message.isVoiceNote && message.audioUrl ? (
+                      <VoiceNoteBubble
+                        audioUrl={message.audioUrl}
+                        text={String(message.content || '')}
+                        voiceId={selectedVoiceId}
+                        messageId={message.id}
+                        autoplay={true}
+                      />
+                    ) : (
+                      <>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{String(message.content || '')}</p>
+                      </>
                     )}
 
                     {/* Message Actions */}
@@ -134,13 +139,16 @@ export default function ChatWindow({ messages = [], typing = false, personaName 
             className="flex items-center gap-3"
           >
             <Avatar name={personaName || 'AI'} size={32} className="flex-shrink-0" />
-            <div className="flex items-center gap-2 rounded-2xl rounded-tl-[4px] border border-[#E5E7EB] bg-white px-4 py-3 text-sm text-[#6B7280] shadow-sm">
+            <div className={`flex items-center gap-2 rounded-2xl rounded-tl-[4px] border px-4 py-3 text-sm shadow-sm ${voiceMode
+              ? 'border-[#DBEAFE] bg-[#EFF6FF] text-[#3B60D9]'
+              : 'border-[#E5E7EB] bg-white text-[#6B7280]'
+              }`}>
               <div className="flex gap-1">
-                <span className="h-2 w-2 animate-bounce rounded-full bg-[#6B7280] [animation-delay:-0.3s]" />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-[#6B7280] [animation-delay:-0.15s]" />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-[#6B7280]" />
+                <span className={`h-2 w-2 animate-bounce rounded-full [animation-delay:-0.3s] ${voiceMode ? 'bg-[#5B7FFF]' : 'bg-[#6B7280]'}`} />
+                <span className={`h-2 w-2 animate-bounce rounded-full [animation-delay:-0.15s] ${voiceMode ? 'bg-[#5B7FFF]' : 'bg-[#6B7280]'}`} />
+                <span className={`h-2 w-2 animate-bounce rounded-full ${voiceMode ? 'bg-[#5B7FFF]' : 'bg-[#6B7280]'}`} />
               </div>
-              <span className="ml-2">Typing...</span>
+              <span className="ml-2">{voiceMode ? 'Recording voice...' : 'Typing...'}</span>
             </div>
           </motion.div>
         )}

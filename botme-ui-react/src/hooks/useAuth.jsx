@@ -123,9 +123,11 @@ export function AuthProvider({ children }) {
       const { data } = await api.post('/api/oauth/google/id-token', { token })
 
       if (data?.user) {
+        console.log('[AUTH] Google Sign-in Success (Existing User):', data.user.email)
         setUserDirect(data.user)
-        return { user: data.user }
+        return { user: data.user, new_user: false }
       } else if (data?.new_user) {
+        console.log('[AUTH] Google Sign-in (New User):', data.email)
         return {
           new_user: true,
           email: data.email,
@@ -134,6 +136,7 @@ export function AuthProvider({ children }) {
           code: data.code // BYPASS_OTP from backend
         }
       }
+      return data || {}
     } catch (error) {
       console.error('[AUTH] Google Sign-in Error:', error)
       throw error
