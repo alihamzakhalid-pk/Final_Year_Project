@@ -5,6 +5,7 @@ import UICard from './ui/Card'
 import Avatar from './Avatar'
 import Tooltip from './ui/Tooltip'
 import { useToast } from './ui/Toast'
+import AudioPlayer from './AudioPlayer'
 
 const formatTime = (timestamp) => {
   const date = new Date(timestamp)
@@ -21,7 +22,7 @@ const formatTime = (timestamp) => {
   return date.toLocaleDateString()
 }
 
-export default function ChatWindow({ messages = [], typing = false, personaName = '' }) {
+export default function ChatWindow({ messages = [], typing = false, personaName = '', selectedVoiceId = null }) {
   const scrollRef = useRef(null)
   const { showSuccess } = useToast()
   const [copiedId, setCopiedId] = useState(null)
@@ -86,13 +87,24 @@ export default function ChatWindow({ messages = [], typing = false, personaName 
                       : 'rounded-2xl rounded-tl-sm border border-[#E5E7EB] bg-white text-[#1F2937] shadow-md'
                       } px-4 py-3 group-hover:shadow-lg transition-all duration-200`}
                   >
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{String(message.content || '')}</p>
+
+                    {/* Audio Player for Assistant */}
+                    {!isUser && selectedVoiceId && (
+                      <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <AudioPlayer
+                          text={String(message.content || '')}
+                          voiceId={selectedVoiceId}
+                          messageId={message.id}
+                        />
+                      </div>
+                    )}
 
                     {/* Message Actions */}
                     <div className={`absolute ${isUser ? '-left-12' : '-right-12'} top-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
                       <Tooltip content={isCopied ? 'Copied!' : 'Copy message'}>
                         <button
-                          onClick={() => handleCopy(message.content, message.id)}
+                          onClick={() => handleCopy(String(message.content || ''), message.id)}
                           className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
                           aria-label="Copy message"
                         >

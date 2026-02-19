@@ -53,3 +53,12 @@ class Config:
     
     # Frontend URL for OAuth redirects
     FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+    
+    # Colab TTS Configuration
+    COLAB_API_URL = os.environ.get('COLAB_API_URL', 'http://localhost:5001')
+    
+    # Audio settings
+    MAX_VOICE_SAMPLE_SIZE = 10 * 1024 * 1024  # 10MB
+    ALLOWED_AUDIO_EXTENSIONS = {'wav', 'mp3', 'ogg', 'm4a', 'flac'}
+    UPLOAD_FOLDER = 'uploads'
+    GENERATED_AUDIO_FOLDER = 'uploads/generated_audio'

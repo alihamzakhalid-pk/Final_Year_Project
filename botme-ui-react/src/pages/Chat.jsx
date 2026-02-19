@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Search, Download, Settings, Upload, MessageSquare, Trash2, Brain } from 'lucide-react'
+import { Search, Download, Settings, Upload, MessageSquare, Trash2, Brain, Volume2 } from 'lucide-react'
 import ChatWindow from '../components/ChatWindow'
 import MessageInput from '../components/MessageInput'
 import UICard from '../components/ui/Card'
@@ -12,6 +12,9 @@ import Avatar from '../components/Avatar'
 import Skeleton from '../components/ui/Skeleton'
 import { useToast } from '../components/ui/Toast'
 import api from '../api/axios'
+import VoiceSettingsModal from '../components/VoiceSettingsModal'
+import ErrorBoundary from '../components/ErrorBoundary'
+import Tooltip from '../components/ui/Tooltip'
 
 export default function Chat() {
   const { chatId } = useParams()
@@ -36,7 +39,25 @@ export default function Chat() {
   const [personaSearchQuery, setPersonaSearchQuery] = useState('')
   const [debugInfo, setDebugInfo] = useState(null)
   const [showDebug, setShowDebug] = useState(false)
+
+  // Voice Settings State
+  const [showVoiceModal, setShowVoiceModal] = useState(false)
+  const [selectedVoiceId, setSelectedVoiceId] = useState(() => {
+    // Load from local storage if available for this chat
+    return localStorage.getItem(`voice_for_chat_${chatId}`) || null
+  })
+
   const { showSuccess, showError } = useToast()
+
+  // Update selected voice and persist
+  const handleVoiceSelect = (voiceId) => {
+    setSelectedVoiceId(voiceId)
+    if (voiceId) {
+      localStorage.setItem(`voice_for_chat_${chatId}`, voiceId)
+    } else {
+      localStorage.removeItem(`voice_for_chat_${chatId}`)
+    }
+  }
 
   // Keyboard shortcut to toggle debug panel (Press 'D' key)
   useEffect(() => {
@@ -74,6 +95,10 @@ export default function Chat() {
       setLoading(false)
       return
     }
+
+    // Reset voice selection when switching chats
+    const savedVoiceId = localStorage.getItem(`voice_for_chat_${chatId}`)
+    setSelectedVoiceId(savedVoiceId || null)
 
     let cancelled = false
     let retryCount = 0
@@ -473,8 +498,8 @@ export default function Chat() {
                     animate={{ opacity: 1, x: 0 }}
                     onClick={() => handleSwitchPersona(persona.chat_id)}
                     className={`group relative flex items-center gap-3 px-5 py-4 cursor-pointer transition-all ${isActive
-                        ? 'bg-[#EFF6FF] border-l-4 border-[#5B7FFF]'
-                        : 'hover:bg-[#F9FAFB]'
+                      ? 'bg-[#EFF6FF] border-l-4 border-[#5B7FFF]'
+                      : 'hover:bg-[#F9FAFB]'
                       }`}
                     style={{ height: '72px' }}
                   >
@@ -535,6 +560,18 @@ export default function Chat() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+
+            {/* Voice Settings Button */}
+            <Tooltip content={selectedVoiceId ? 'Voice Active' : 'Select Voice'}>
+              <button
+                onClick={() => setShowVoiceModal(true)}
+                className={`rounded-lg p-2 transition-colors ${selectedVoiceId ? 'text-primary bg-primary/10' : 'text-[#6B7280] hover:bg-[#F9FAFB] hover:text-[#5B7FFF]'}`}
+                aria-label="Voice Settings"
+              >
+                <Volume2 className="h-5 w-5" />
+              </button>
+            </Tooltip>
+
             {selectedPerson && (
               <UIButton
                 onClick={() => navigate(`/personality/${chatId}`, { state: { personName: selectedPerson, chatId } })}
@@ -602,11 +639,14 @@ export default function Chat() {
               </div>
             </div>
           ) : (
-            <ChatWindow
-              messages={searchQuery ? filteredMessages : messages}
-              typing={typing}
-              personaName={selectedPerson || 'AI'}
-            />
+            <ErrorBoundary>
+              <ChatWindow
+                messages={searchQuery ? filteredMessages : messages}
+                typing={typing}
+                personaName={selectedPerson || 'AI'}
+                selectedVoiceId={selectedVoiceId}
+              />
+            </ErrorBoundary>
           )}
         </div>
 
@@ -618,6 +658,14 @@ export default function Chat() {
           />
         </div>
       </div>
+
+      {/* Voice Settings Modal */}
+      <VoiceSettingsModal
+        isOpen={showVoiceModal}
+        onClose={() => setShowVoiceModal(false)}
+        selectedVoiceId={selectedVoiceId}
+        onVoiceSelect={handleVoiceSelect}
+      />
     </div>
   )
 }
