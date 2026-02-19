@@ -19,6 +19,7 @@ class Config:
     SQLALCHEMY_DATABASE_URI = db_url or 'sqlite:///botme.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+    GROQ_API_KEY = os.environ.get('GROQ_API_KEY')
     # GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
     MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # 5MB for uploads
     # Cookie/session settings for dev via Vite proxy (same-origin requests)
