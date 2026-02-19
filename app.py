@@ -1,5 +1,5 @@
 from flask import Flask, request, redirect, url_for, flash, jsonify, session
-from sqlalchemy import func
+from sqlalchemy import func, text
 import re
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -173,6 +173,19 @@ def admin_required(f):
 # Create DB tables and clean up old temp entries on startup
 with app.app_context():
     db.create_all()
+    
+    # [MIGRATION] Handle PostgreSQL column length issues on Render
+    if os.environ.get('RENDER'):
+        try:
+            # PostgreSQL needs a manual ALTER to expand the column if it was already created
+            db.session.execute(text("ALTER TABLE \"user\" ALTER COLUMN password_hash TYPE VARCHAR(500)"))
+            db.session.commit()
+            print("[MIGRATION] Successfully expanded user.password_hash column")
+        except Exception as e:
+            # Ignore if column is already long or doesn't exist yet
+            db.session.rollback()
+            print(f"[MIGRATION] Note: Column expansion check skipped or failed (likely already updated): {e}")
+
     # Optional: Clean up old temp entries (older than 1 hour)
     cutoff = datetime.utcnow() - timedelta(hours=1)
     temp_entries = ChatData.query.filter_by(is_temp=True).filter(ChatData.created_at < cutoff).all()
