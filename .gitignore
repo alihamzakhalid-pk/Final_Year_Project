@@ -22,6 +22,18 @@ botme-ui-react/node_modules/
 botme-ui-react/dist/
 botme-ui-react/.vite/
 
+# dependencies
+node_modules/
+botme-ui-react/node_modules/
+
+# build
+dist/
+build/
+
+# vite
+.vite/
+botme-ui-react/.vite/
+
 # RAG
 chroma_db/
 *.index
@@ -40,3 +52,5 @@ flask_session/
 check_message_count.py
 debug_chats.py
 test_rag_manually.py
+
+uploads/

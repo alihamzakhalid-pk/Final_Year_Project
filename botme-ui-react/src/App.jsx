@@ -22,90 +22,97 @@ import PersonalityAnalysis from './pages/PersonalityAnalysis'
 import Admin from './pages/Admin'
 import { ToastProvider } from './components/ui/Toast'
 
+import ErrorBoundary from './components/ErrorBoundary'
+
 export default function App() {
   const location = useLocation()
+  console.log("App rendering, path:", location.pathname);
 
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <div className="min-h-screen flex flex-col bg-[#F8FAFC] dark:bg-[#1F2937] transition-colors duration-300">
-          <Navbar />
-          <AnimatePresence mode="wait">
-            <motion.main
-              key={location.pathname}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.4, ease: 'easeOut' }}
-              className="flex-1"
-            >
-              <Routes location={location}>
-                <Route path="/" element={<Landing />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/help" element={<Help />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/privacy" element={<Privacy />} />
-                <Route path="/terms" element={<Terms />} />
-                <Route
-                  path="/dashboard"
-                  element={(
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  )}
-                />
-                <Route
-                  path="/select/:chatId"
-                  element={(
-                    <ProtectedRoute>
-                      <SelectPerson />
-                    </ProtectedRoute>
-                  )}
-                />
-                <Route
-                  path="/chat/:chatId"
-                  element={(
-                    <ProtectedRoute>
-                      <Chat />
-                    </ProtectedRoute>
-                  )}
-                />
-                <Route
-                  path="/settings"
-                  element={(
-                    <ProtectedRoute>
-                      <Settings />
-                    </ProtectedRoute>
-                  )}
-                />
-                <Route
-                  path="/personality/:chatId?"
-                  element={(
-                    <ProtectedRoute>
-                      <PersonalityAnalysis />
-                    </ProtectedRoute>
-                  )}
-                />
-                <Route
-                  path="/admin"
-                  element={(
-                    <ProtectedRoute>
-                      <Admin />
-                    </ProtectedRoute>
-                  )}
-                />
-                <Route path="/chat" element={<Navigate to="/dashboard" replace />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </motion.main>
-          </AnimatePresence>
-          {!location.pathname.startsWith('/chat') && <Footer />}
-        </div>
-      </AuthProvider>
-    </ToastProvider>
+    <ErrorBoundary>
+      <ToastProvider>
+        <AuthProvider>
+          <div className="min-h-screen flex flex-col bg-[#F8FAFC] dark:bg-[#1F2937] transition-colors duration-300">
+            <Navbar />
+            <AnimatePresence mode="wait">
+              <motion.main
+                key={location.pathname}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+                className="flex-1"
+              >
+                <ErrorBoundary>
+                  <Routes location={location}>
+                    <Route path="/" element={<Landing />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/signup" element={<Signup />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/about" element={<About />} />
+                    <Route path="/help" element={<Help />} />
+                    <Route path="/contact" element={<Contact />} />
+                    <Route path="/privacy" element={<Privacy />} />
+                    <Route path="/terms" element={<Terms />} />
+                    <Route
+                      path="/dashboard"
+                      element={(
+                        <ProtectedRoute>
+                          <Dashboard />
+                        </ProtectedRoute>
+                      )}
+                    />
+                    <Route
+                      path="/select/:chatId"
+                      element={(
+                        <ProtectedRoute>
+                          <SelectPerson />
+                        </ProtectedRoute>
+                      )}
+                    />
+                    <Route
+                      path="/chat/:chatId"
+                      element={(
+                        <ProtectedRoute>
+                          <Chat />
+                        </ProtectedRoute>
+                      )}
+                    />
+                    <Route
+                      path="/settings"
+                      element={(
+                        <ProtectedRoute>
+                          <Settings />
+                        </ProtectedRoute>
+                      )}
+                    />
+                    <Route
+                      path="/personality/:chatId?"
+                      element={(
+                        <ProtectedRoute>
+                          <PersonalityAnalysis />
+                        </ProtectedRoute>
+                      )}
+                    />
+                    <Route
+                      path="/admin"
+                      element={(
+                        <ProtectedRoute>
+                          <Admin />
+                        </ProtectedRoute>
+                      )}
+                    />
+                    <Route path="/chat" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </ErrorBoundary>
+              </motion.main>
+            </AnimatePresence>
+            {!location.pathname.startsWith('/chat') && <Footer />}
+          </div>
+        </AuthProvider>
+      </ToastProvider>
+    </ErrorBoundary>
   )
 }
 

@@ -37,11 +37,12 @@ class ChatData(db.Model):
     all_messages = db.Column(db.Text, default='[]', nullable=False)  # JSON of full messages_by_person for temp stage
     messages = db.Column(db.Text, default='[]', nullable=False)  # JSON of final selected messages (list of dicts or strings)
     conversation_history = db.Column(db.Text, default='[]', nullable=False)  # NEW: JSON list of {"role": "user/assistant", "content": str}
+    voice_sample_id = db.Column(db.Integer, db.ForeignKey('voice_sample.id'), nullable=True)  # Link to voice sample for TTS
     is_temp = db.Column(db.Boolean, default=False, nullable=False)  # Flag for temporary entries
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
  
     def __repr__(self):
-        return f'<ChatData {self.id} for User {self.user_id}, Temp: {self.is_temp}>'
+        return f'<GeneratedAudio {self.id} - Hash: {self.message_hash[:8]}...>'
 
 class VerificationCode(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -58,3 +59,43 @@ class VerificationCode(db.Model):
     
     def __repr__(self):
         return f'<VerificationCode {self.code} for {self.email} ({self.purpose})>'
+
+class VoiceSample(db.Model):
+    """Store voice samples for TTS cloning"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    chat_id = db.Column(db.Integer, db.ForeignKey('chat_data.id'), nullable=True)
+    persona_name = db.Column(db.String(100), nullable=False)
+    
+    # ElevenLabs voice data
+    elevenlabs_voice_id = db.Column(db.String(255), nullable=False)  # Voice ID from ElevenLabs API
+    voice_name = db.Column(db.String(200), nullable=False)
+    
+    # File storage (local backup)
+    audio_file_path = db.Column(db.String(500), nullable=False)
+    duration_seconds = db.Column(db.Float, nullable=True)
+    
+    # Metadata
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', backref='voice_samples')
+    
+    def __repr__(self):
+        return f'<VoiceSample {self.id} - {self.voice_name} (User {self.user_id})>'
+
+class GeneratedAudio(db.Model):
+    """Cache generated TTS audio to avoid regeneration"""
+    id = db.Column(db.Integer, primary_key=True)
+    message_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)  # SHA256 of text
+    voice_sample_id = db.Column(db.Integer, db.ForeignKey('voice_sample.id'), nullable=False)
+    audio_file_path = db.Column(db.String(500), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_accessed = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    voice_sample = db.relationship('VoiceSample', backref='generated_audios')
+    
+    def __repr__(self):
+        return f'<GeneratedAudio {self.id} - Hash: {self.message_hash[:8]}...>'

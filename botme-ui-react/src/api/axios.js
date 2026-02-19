@@ -156,6 +156,19 @@ export const api = {
   async delete(url, options = {}) {
     return execute({ url, method: 'DELETE', ...options })
   },
+  // Voice API
+  async uploadVoice(formData) {
+    return execute({ url: '/api/voice/upload', method: 'POST', body: formData })
+  },
+  async getVoices() {
+    return execute({ url: '/api/voice/samples', method: 'GET' })
+  },
+  async deleteVoice(id) {
+    return execute({ url: `/api/voice/samples/${id}`, method: 'DELETE' })
+  },
+  async generateTTS(data) {
+    return execute({ url: '/api/tts/generate', method: 'POST', body: data })
+  }
 }
 
 // Attach token from localStorage when present
