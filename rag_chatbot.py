@@ -1,6 +1,6 @@
 """
 RAG (Retrieval-Augmented Generation) Chatbot Module
-Handles vector embeddings, storage and retrieval for enhanced chatbot responses
+Handles vector embeddings, storage, and retrieval for enhanced chatbot responses
 """
 
 import json
