@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Play, Pause, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import { motion } from 'framer-motion'
-import api from '../api/axios'
+import api, { baseURL } from '../api/axios'
 
 export default function VoiceNoteBubble({ audioUrl, text, voiceId, messageId, autoplay = false }) {
     const [isPlaying, setIsPlaying] = useState(false)
@@ -65,6 +65,8 @@ export default function VoiceNoteBubble({ audioUrl, text, voiceId, messageId, au
     const initAudio = useCallback(() => {
         if (!audioRef.current) {
             audioRef.current = new Audio()
+            // Enable credentials for cross-origin audio requests
+            audioRef.current.crossOrigin = "use-credentials"
             audioRef.current.addEventListener('ended', () => {
                 setIsPlaying(false)
                 setCurrentTime(0)
@@ -117,7 +119,7 @@ export default function VoiceNoteBubble({ audioUrl, text, voiceId, messageId, au
         // Build the full URL for the audio
         const fullUrl = resolvedUrl.startsWith('http')
             ? resolvedUrl
-            : `${window.location.origin}${resolvedUrl}`
+            : `${baseURL}${resolvedUrl}`
 
         if (!audio.src || !audio.src.includes(resolvedUrl)) {
             audio.src = fullUrl
