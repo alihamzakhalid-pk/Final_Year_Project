@@ -68,9 +68,18 @@ class ElevenLabsClient:
         """
         try:
             # Generate audio using the multilingual model for Urdu support
+            # Use specific settings for better clarity and stability
             audio = generate(
                 text=text,
-                voice=voice_id,
+                voice=Voice(
+                    voice_id=voice_id,
+                    settings=VoiceSettings(
+                        stability=0.5,
+                        similarity_boost=0.8,
+                        style=0.0,
+                        use_speaker_boost=True
+                    )
+                ),
                 model="eleven_multilingual_v2"
             )
             return audio

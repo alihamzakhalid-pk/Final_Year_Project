@@ -292,14 +292,16 @@ export default function Chat() {
       let audioUrl = null
       if (voiceMode && selectedVoiceId) {
         setStatus('Generating voice…')
+        console.log(`[Chat] Requesting TTS for voice: ${selectedVoiceId}`);
         try {
           const ttsResponse = await api.post('/api/tts/generate', {
             text: replyText,
             voice_sample_id: selectedVoiceId
           })
           audioUrl = ttsResponse.data?.audio_url || null
+          console.log(`[Chat] TTS Success: ${audioUrl}`);
         } catch (ttsErr) {
-          console.error('Voice Mode TTS failed, falling back to text:', ttsErr)
+          console.error('[Chat] Voice Mode TTS failed:', ttsErr)
           // Don't block the message — just show text if TTS fails
         }
       }

@@ -44,19 +44,28 @@ export default function VoiceNoteBubble({ audioUrl, text, voiceId, messageId, au
     const generateAudio = async () => {
         setIsLoading(true)
         setError(null)
+        if (!voiceId) {
+            console.error('VoiceNoteBubble: No voiceId provided for generation');
+            setError('Please select a voice first');
+            setIsLoading(false);
+            return;
+        }
+
         try {
+            console.log(`VoiceNoteBubble: Requesting TTS for voiceId: ${voiceId}`);
             const response = await api.post('/api/tts/generate', {
-                text,
+                text: text,
                 voice_sample_id: voiceId
             })
             if (response.data?.audio_url) {
+                console.log(`VoiceNoteBubble: Successfully generated audio: ${response.data.audio_url}`);
                 setResolvedUrl(response.data.audio_url)
             } else {
                 throw new Error('No audio URL returned')
             }
         } catch (err) {
             console.error('VoiceNoteBubble: TTS generation failed:', err)
-            setError('Failed to generate voice')
+            setError('Failed to generate voice - check your quota or connection')
         } finally {
             setIsLoading(false)
         }
@@ -139,12 +148,18 @@ export default function VoiceNoteBubble({ audioUrl, text, voiceId, messageId, au
                     }
                     audio.addEventListener('canplaythrough', onCanPlay)
                     audio.addEventListener('error', onError)
-                    // Fallback timeout
+                    // Fallback timeout - generation can take a while
                     setTimeout(() => {
-                        if (audio.readyState >= 3) resolve()
-                    }, 5000)
+                        if (audio.readyState >= 3) {
+                            resolve()
+                        } else {
+                            console.warn('VoiceNoteBubble: Audio load timed out, attempting play anyway');
+                            resolve() // Try anyway
+                        }
+                    }, 15000)
                 })
-            } catch {
+            } catch (err) {
+                console.error('VoiceNoteBubble: Audio loading rejected:', err)
                 setError('Failed to load audio')
                 setIsLoading(false)
                 return
@@ -153,12 +168,17 @@ export default function VoiceNoteBubble({ audioUrl, text, voiceId, messageId, au
         }
 
         try {
+            console.log(`VoiceNoteBubble: Attempting to play ${audio.src}`);
             await audio.play()
             setIsPlaying(true)
             setError(null)
-        } catch {
-            // Autoplay was blocked, clear error — user can click again
-            setError(null)
+        } catch (playErr) {
+            console.error('VoiceNoteBubble: Playback failed:', playErr);
+            if (playErr.name === 'NotAllowedError') {
+                setError('Playback blocked - please click again to play');
+            } else {
+                setError('Playback failed');
+            }
         }
     }
 

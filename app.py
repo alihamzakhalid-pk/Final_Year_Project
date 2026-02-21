@@ -1820,8 +1820,9 @@ def api_generate_tts():
         return jsonify({'error': 'Missing text or voice_sample_id'}), 400
         
     # 1. Check Cache
-    # Create hash of (text + voice_id) to uniquely identify this audio
-    message_hash = hashlib.sha256(f"{text}_{voice_sample_id}".encode()).hexdigest()
+    # Create hash of (text + voice_id + settings_version) to uniquely identify this audio
+    # Adding 'v2' to invalidate old caches with the new clarity settings
+    message_hash = hashlib.sha256(f"{text}_{voice_sample_id}_v2".encode()).hexdigest()
     
     cached_audio = GeneratedAudio.query.filter_by(message_hash=message_hash).first()
     if cached_audio:
@@ -1874,7 +1875,9 @@ def api_generate_tts():
         })
         
     except Exception as e:
-        print(f"TTS Generation failed: {e}")
+        import traceback
+        print(f"[TTS ERROR] Generation failed: {str(e)}")
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/audio/<int:audio_id>', methods=['GET'])
@@ -1884,19 +1887,23 @@ def api_serve_audio(audio_id):
     # Fix for NameError:
     from flask import send_file
     
+    print(f"[SERVE_AUDIO] Request for audio_id: {audio_id} from user: {current_user.id}")
     try:
         audio = GeneratedAudio.query.get_or_404(audio_id)
         
         # Ensure absolute path for safety
         abs_path = os.path.abspath(audio.audio_file_path)
+        print(f"[SERVE_AUDIO] Found record. File path: {abs_path}")
         
         if not os.path.exists(abs_path):
-            print(f"[SERVE_AUDIO] File missing at: {abs_path}")
+            print(f"[SERVE_AUDIO] ❌ File missing at: {abs_path}")
             return jsonify({'error': f'Audio file missing at server path: {abs_path}'}), 404
             
+        size = os.path.getsize(abs_path)
+        print(f"[SERVE_AUDIO] ✅ Serving file. Size: {size} bytes")
         return send_file(abs_path, mimetype='audio/mpeg')
     except Exception as e:
-        print(f"[SERVE_AUDIO] Error serving file: {e}")
+        print(f"[SERVE_AUDIO] ❌ Error serving file: {e}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
