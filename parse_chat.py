@@ -7,141 +7,109 @@ def parse_chat_file(content):
     Robust WhatsApp chat parser that handles multiple formats and special characters.
     Supports various date formats and system messages.
     """
+    # 1. Clean overall content
     # Remove BOM (Byte Order Mark) if present at the start
     if content.startswith('\ufeff'):
         content = content[1:]
     
-    # Remove any other invisible unicode characters at the start
-    content = content.lstrip('\u200b\u200c\u200d\ufeff')
+    # Remove any other invisible unicode characters at the start of the file
+    content = content.lstrip('\u200b\u200c\u200d\ufeff\u200e\u200f')
     
-    # Common WhatsApp date/time patterns
-    # Supports formats like:
-    # [DD/MM/YYYY, HH:MM:SS] Name: Message
-    # DD/MM/YYYY, HH:MM - Name: Message
-    # DD/MM/YY, HH:MM AM/PM - Name: Message
-    # M/D/YY, H:MM AM/PM - Name: Message
+    # regex patterns for WhatsApp headers
+    # We include [\u200e\u200f]? at the start to handle directional marks common in mobile exports
     patterns = [
-        # Pattern 1: [DD/MM/YYYY, HH:MM:SS] or [DD/MM/YY, HH:MM:SS]
-        r'^\[?(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}),?\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[APap][Mm])?)\]?\s*[-–—]?\s*([^:]+?):\s*(.*)$',
-        # Pattern 2: DD/MM/YYYY, HH:MM - Name: Message (without brackets)
-        r'^(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}),?\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[APap][Mm])?)\s*[-–—]\s*([^:]+?):\s*(.*)$',
-        # Pattern 3: More flexible format
-        r'^(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})[,\s]+(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[APap][Mm])?)\s*[-–—:]\s*([^:]+?):\s*(.*)$',
+        # Pattern 1: [DD/MM/YYYY, HH:MM:SS] or [DD/MM/YY, HH:MM:SS] (iOS style)
+        r'^[\u200e\u200f]?\[(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}),?\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[APap][Mm])?)\]\s*([^:]+?):\s*(.*)$',
+        # Pattern 2: DD/MM/YYYY, HH:MM - Name: Message (Android style)
+        r'^[\u200e\u200f]?(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}),?\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[APap][Mm])?)\s*[-–—]\s*([^:]+?):\s*(.*)$',
+        # Pattern 3: Flexible format for other variations
+        r'^[\u200e\u200f]?(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})[,\s]+(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[APap][Mm])?)\s*[-–—:]\s*([^:]+?):\s*(.*)$',
     ]
     
     messages_by_person = defaultdict(list)
     current_message = None
     lines = content.split('\n')
     
-    # System messages to ignore (localized versions)
+    # System messages to ignore
     system_keywords = [
         'Messages and calls are end-to-end encrypted',
-        'created group',
-        'added',
-        'removed',
-        'left',
-        'changed the subject',
-        'changed this group',
-        'security code changed',
-        'joined using this group',
-        'image omitted',
-        'video omitted',
-        'audio omitted',
-        'sticker omitted',
-        'document omitted',
-        'GIF omitted',
-        'Contact card omitted',
-        'You deleted this message',
-        'This message was deleted',
-        'missed voice call',
-        'missed video call',
-        '<Media omitted>',
-        'null',
+        'created group', 'added', 'removed', 'left',
+        'changed the subject', 'security code changed',
+        'joined using this group', 'image omitted',
+        'video omitted', 'audio omitted', 'sticker omitted',
+        'document omitted', 'GIF omitted', '<Media omitted>',
+        'missed voice call', 'missed video call',
+        'You deleted this message', 'This message was deleted'
     ]
     
     def is_system_message(text):
-        """Check if a message is a system message"""
         text_lower = text.lower().strip()
         return any(keyword.lower() in text_lower for keyword in system_keywords)
     
-    def clean_message(text):
-        """Clean and normalize message text"""
-        # Remove extra whitespace
-        text = ' '.join(text.split())
-        # Remove common artifacts
-        text = text.strip()
-        return text
-    
+    def clean_text(text):
+        """Remove control characters and normalize whitespace"""
+        if not text: return ""
+        # Remove LRM, RLM, and other invisible chars
+        text = text.replace('\u200e', '').replace('\u200f', '').replace('\u200b', '')
+        return ' '.join(text.split()).strip()
+
     for line in lines:
-        line = line.strip()
-        if not line:
+        # Pre-clean the line of invisible marks that break regex anchors
+        clean_line = line.strip().lstrip('\u200e\u200f\u200b\ufeff')
+        if not clean_line:
             continue
         
-        # Try to match with any of the patterns
         matched = False
         for pattern in patterns:
-            match = re.match(pattern, line)
+            # We use re.match with the cleaned line
+            match = re.match(pattern, clean_line)
+            if not match:
+                # Try pattern without leading anchor in case of weird whitespace/marks
+                match = re.search(pattern, clean_line)
+                
             if match:
                 date_str, time_str, sender, message = match.groups()
                 
-                # Clean sender name (remove extra spaces, special chars)
-                sender = sender.strip().replace('\u202a', '').replace('\u202c', '')
+                # Clean sender and message
+                sender = clean_text(sender)
+                message = clean_text(message)
                 
-                # Clean message
-                message = clean_message(message)
-                
-                # Skip empty messages or system messages
                 if not message or is_system_message(message) or not sender:
                     matched = True
                     current_message = None
                     break
                 
-                # Skip if sender name looks like a system message
-                if any(keyword.lower() in sender.lower() for keyword in ['whatsapp', 'security', 'encryption']):
+                # Skip system senders
+                if any(k in sender.lower() for k in ['whatsapp', 'security', 'encryption']):
                     matched = True
                     current_message = None
                     break
                 
-                # Valid message found
-                current_message = {
-                    'sender': sender,
-                    'message': message
-                }
+                current_message = {'sender': sender, 'message': message}
                 messages_by_person[sender].append(message)
                 matched = True
                 break
         
-        # If no pattern matched, it might be a continuation of previous message
+        # Continuation of previous message
         if not matched and current_message:
-            # Append to the last message (multi-line message)
-            continuation = clean_message(line)
+            continuation = clean_text(line)
             if continuation and not is_system_message(continuation):
                 messages_by_person[current_message['sender']][-1] += ' ' + continuation
     
-    # Filter out participants with too few messages (likely system or errors)
-    MIN_MESSAGES = 3
-    filtered_messages = {
-        person: msgs 
-        for person, msgs in messages_by_person.items() 
-        if len(msgs) >= MIN_MESSAGES and person.strip()
-    }
+    # Filter participants
+    participants = [p for p, m in messages_by_person.items() if len(m) >= 2]
+    final_messages = {p: messages_by_person[p] for p in participants}
     
-    # Additional validation: remove participants with suspicious names
-    final_messages = {}
-    for person, msgs in filtered_messages.items():
-        # Skip names that are too short or contain only numbers/special chars
-        if len(person.strip()) >= 2 and not person.replace('+', '').replace('-', '').isdigit():
-            final_messages[person] = msgs
-    
-    # Get unique participants
-    participants = list(final_messages.keys())
-    
-    # Raise error if not enough participants
     if len(participants) < 2:
-        if len(participants) == 0:
-            raise ValueError("No valid messages found in the chat file. Please ensure it's a valid WhatsApp export.")
+        if not participants:
+            raise ValueError("No valid messages found. Please ensure this is a standard WhatsApp .txt export.")
         else:
-            raise ValueError("Chat must have at least 2 participants.")
+            raise ValueError(f"Only found one participant: {participants[0]}. Chat must have at least 2 people.")
+    
+    return {
+        'messages_by_person': final_messages,
+        'participants': participants
+    }
     
     return {
         'messages_by_person': final_messages,

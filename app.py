@@ -685,15 +685,43 @@ def api_upload():
     if not file or not allowed_file(file.filename):
         return jsonify({'error': 'Invalid file type. Only .txt files are allowed.'}), 400
     try:
-        content = file.read().decode('utf-8', errors='ignore')
+        # Try decoding with different encodings
+        content = None
+        encodings_to_try = [
+            ('utf-8-sig', 'replace'), # Handles UTF-8 with BOM
+            ('utf-8', 'ignore'),      # Standard UTF-8
+            ('utf-16', 'ignore'),     # Some mobile/windows exports
+            ('latin-1', 'ignore')     # Fallback for weird characters
+        ]
+        
+        raw_data = file.read()
+        for enc, err_mode in encodings_to_try:
+            try:
+                decoded = raw_data.decode(enc, errors=err_mode)
+                # Basic validation: does it look like a WhatsApp chat?
+                test_content = decoded.lstrip('\ufeff\u200e\u200f\u200b\u200c\u200d').strip()
+                if len(test_content) > 20: 
+                    if re.search(r'^\d{1,4}[/-]\d{1,2}[/-]\d{1,4}', test_content) or test_content.startswith('['):
+                        content = decoded
+                        print(f"[UPLOAD] Successfully decoded with {enc}")
+                        break
+            except Exception:
+                continue
+                
+        if content is None:
+            content = raw_data.decode('utf-8', errors='ignore')
+            print(f"[UPLOAD] Warning: No encoding matched perfectly, falling back to UTF-8 ignore")
+
         if not content or len(content.strip()) < 50:
             return jsonify({'error': 'File appears empty or too short. Please ensure it contains valid chat messages.'}), 400
+        
         parsed = parse_chat_file(content)
         if not parsed.get('participants') or len(parsed['participants']) < 2:
-            return jsonify({'error': 'Could not find at least 2 participants. Please ensure your WhatsApp export contains messages from multiple people.'}), 400
+             return jsonify({'error': 'Could not find enough participants. Ensure the file contains a conversation between at least 2 people.'}), 400
+             
         total_messages = sum(len(msgs) for msgs in parsed['messages_by_person'].values())
-        if total_messages < 10:
-            return jsonify({'error': 'Not enough messages found. Please upload a chat with at least 10 messages.'}), 400
+        if total_messages < 5: 
+            return jsonify({'error': f'Only {total_messages} messages found. Please upload a longer chat history.'}), 400
         temp_chat = ChatData(
             user_id=current_user.id,
             selected_person=None,
