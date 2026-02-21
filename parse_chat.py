@@ -110,11 +110,6 @@ def parse_chat_file(content):
         'messages_by_person': final_messages,
         'participants': participants
     }
-    
-    return {
-        'messages_by_person': final_messages,
-        'participants': participants
-    }
 
 
 # Test function for debugging
