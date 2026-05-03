@@ -40,9 +40,14 @@ class ChatData(db.Model):
     voice_sample_id = db.Column(db.Integer, db.ForeignKey('voice_sample.id'), nullable=True)  # Link to voice sample for TTS
     is_temp = db.Column(db.Boolean, default=False, nullable=False)  # Flag for temporary entries
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Mood-dependent features
+    current_mood = db.Column(db.String(20), default='natural', nullable=False)  # 'natural', 'happy', 'sad'
+    mood_selected_at = db.Column(db.DateTime, default=datetime.utcnow)
+    mood_history = db.Column(db.Text, default='[]', nullable=False)  # JSON list of mood changes with timestamps
  
     def __repr__(self):
-        return f'<GeneratedAudio {self.id} - Hash: {self.message_hash[:8]}...>'
+        return f'<ChatData {self.id} - Person: {self.selected_person}>'
 
 class VerificationCode(db.Model):
     id = db.Column(db.Integer, primary_key=True)

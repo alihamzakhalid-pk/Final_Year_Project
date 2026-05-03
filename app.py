@@ -959,6 +959,7 @@ def api_chat_rag(chat_id):
     """
     data = request.json or {}
     user_input = data.get('message')
+    mood = data.get('mood', 'natural')  # Default to natural if not provided
     
     if not user_input:
         return jsonify({'error': 'No message provided'}), 400
@@ -985,7 +986,7 @@ def api_chat_rag(chat_id):
             print(f"[API] Using user-provided OpenAI API key for user {current_user.id}")
         
         print(f"\n[API] RAG SYSTEM endpoint called for chat {chat_id}")
-        response = get_chatbot_response_rag(chat_id, user_input, user_openai_key)
+        response = get_chatbot_response_rag(chat_id, user_input, user_openai_key, mood)
         return jsonify({'response': response, 'source': 'rag'})
     except Exception as e:
         import traceback
@@ -1766,11 +1767,26 @@ def api_voice_upload():
                 )
                 print(f"[VOICE-CLONE] Successfully cloned voice: {voice_data.get('voice_id')}")
             except Exception as e:
-                # If cloning fails, clean up the file
-                print(f"[VOICE-CLONE ERROR] ElevenLabs cloning failed: {str(e)}")
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                raise e
+                error_msg = str(e)
+                print(f"[VOICE-CLONE ERROR] ElevenLabs cloning failed: {error_msg}")
+                
+                # Check if it's a subscription issue
+                if "subscription does not include instant voice cloning" in error_msg.lower():
+                    # Don't delete the file - keep it for later when user upgrades
+                    print(f"[VOICE-CLONE] Keeping file for later cloning: {file_path}")
+                    return jsonify({
+                        'error': 'Voice cloning requires ElevenLabs premium plan. Your voice sample has been saved and will be cloned once you upgrade your ElevenLabs subscription.',
+                        'file_saved': True,
+                        'requires_upgrade': True
+                    }), 200
+                else:
+                    # For other errors, try to clean up the file
+                    try:
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
+                    except Exception as cleanup_error:
+                        print(f"[VOICE-CLONE] Failed to cleanup file after error: {cleanup_error}")
+                    raise e
             
             # 3. Save to Database
             voice_sample = VoiceSample(
@@ -1933,6 +1949,111 @@ def api_serve_audio(audio_id):
     except Exception as e:
         print(f"[SERVE_AUDIO] ❌ Error serving file: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+# ==================== MOOD MANAGEMENT ENDPOINTS ====================
+
+from mood_config import get_all_moods, get_mood_config, validate_mood, build_mood_aware_prompt
+
+@app.route('/api/moods', methods=['GET'])
+@login_required
+def api_get_moods():
+    """Get all available moods"""
+    try:
+        moods = get_all_moods()
+        return jsonify({'moods': moods}), 200
+    except Exception as e:
+        print(f"[MOOD] Error getting moods: {e}")
+        return jsonify({'error': 'Failed to get moods'}), 500
+
+@app.route('/api/chat/<int:chat_id>/mood', methods=['GET'])
+@login_required
+def api_get_chat_mood(chat_id):
+    """Get current mood for a chat"""
+    try:
+        chat = ChatData.query.filter_by(id=chat_id, user_id=current_user.id).first()
+        if not chat:
+            return jsonify({'error': 'Chat not found'}), 404
+
+        safe_mood = chat.current_mood if chat.current_mood in get_all_moods() else 'natural'
+        if safe_mood != chat.current_mood:
+            chat.current_mood = safe_mood
+            db.session.commit()
+
+        mood_config = get_mood_config(safe_mood)
+        return jsonify({
+            'current_mood': safe_mood,
+            'mood_name': mood_config['name'],
+            'mood_emoji': mood_config['emoji'],
+            'mood_color': mood_config['color'],
+            'selected_at': chat.mood_selected_at.isoformat() if chat.mood_selected_at else None
+        }), 200
+    except Exception as e:
+        print(f"[MOOD] Error getting chat mood: {e}")
+        return jsonify({'error': 'Failed to get chat mood'}), 500
+
+@app.route('/api/chat/<int:chat_id>/mood', methods=['POST'])
+@login_required
+def api_set_chat_mood(chat_id):
+    """Set mood for a chat"""
+    try:
+        data = request.json or {}
+        new_mood = data.get('mood')
+
+        if not new_mood:
+            return jsonify({'error': 'Mood is required'}), 400
+
+        if not validate_mood(new_mood):
+            return jsonify({'error': f'Invalid mood. Valid moods: {list(get_all_moods().keys())}'}), 400
+
+        chat = ChatData.query.filter_by(id=chat_id, user_id=current_user.id).first()
+        if not chat:
+            return jsonify({'error': 'Chat not found'}), 404
+
+        # Record mood change in history
+        mood_history = json.loads(chat.mood_history or '[]')
+        mood_history.append({
+            'mood': new_mood,
+            'changed_at': datetime.utcnow().isoformat(),
+            'previous_mood': chat.current_mood
+        })
+
+        # Update chat mood
+        chat.current_mood = new_mood
+        chat.mood_selected_at = datetime.utcnow()
+        chat.mood_history = json.dumps(mood_history[-10:])  # Keep last 10 changes
+
+        db.session.commit()
+
+        mood_config = get_mood_config(new_mood)
+        return jsonify({
+            'success': True,
+            'current_mood': new_mood,
+            'mood_name': mood_config['name'],
+            'mood_emoji': mood_config['emoji'],
+            'mood_color': mood_config['color'],
+            'message': f'Mood changed to {mood_config["name"]}'
+        }), 200
+    except Exception as e:
+        print(f"[MOOD] Error setting chat mood: {e}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to set chat mood'}), 500
+
+@app.route('/api/chat/<int:chat_id>/mood-history', methods=['GET'])
+@login_required
+def api_get_mood_history(chat_id):
+    """Get mood change history for a chat"""
+    try:
+        chat = ChatData.query.filter_by(id=chat_id, user_id=current_user.id).first()
+        if not chat:
+            return jsonify({'error': 'Chat not found'}), 404
+
+        mood_history = json.loads(chat.mood_history or '[]')
+        return jsonify({'mood_history': mood_history}), 200
+    except Exception as e:
+        print(f"[MOOD] Error getting mood history: {e}")
+        return jsonify({'error': 'Failed to get mood history'}), 500
+
 
 if __name__ == '__main__':
     # Local development: bind to 127.0.0.1:5000

@@ -51,11 +51,23 @@ export default function VoiceUpload({ onVoiceAdded }) {
             clearInterval(progressInterval)
             setUploadProgress(100)
 
-            showSuccess('Voice cloned successfully!')
-            setFile(null)
-            setPersonaName('')
-            if (onVoiceAdded && response.data?.voice_sample) {
-                onVoiceAdded(response.data.voice_sample)
+            // Handle different response types
+            if (response.data?.requires_upgrade) {
+                showSuccess('Voice sample saved! Upgrade your ElevenLabs plan to enable instant cloning.')
+                setFile(null)
+                setPersonaName('')
+                // Don't call onVoiceAdded since cloning didn't complete
+            } else if (response.data?.voice_sample) {
+                showSuccess('Voice cloned successfully!')
+                setFile(null)
+                setPersonaName('')
+                if (onVoiceAdded) {
+                    onVoiceAdded(response.data.voice_sample)
+                }
+            } else {
+                showSuccess('Voice uploaded successfully!')
+                setFile(null)
+                setPersonaName('')
             }
         } catch (error) {
             console.error('Upload failed:', error)
@@ -75,7 +87,7 @@ export default function VoiceUpload({ onVoiceAdded }) {
                 </div>
                 <div>
                     <h3 className="font-semibold text-slate-900 dark:text-white">Clone a Voice</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Upload a 1-5 min audio sample (mp3, wav) to clone.</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Upload a 1-5 min audio sample (mp3, wav) to clone. Premium ElevenLabs plan required for instant cloning.</p>
                 </div>
             </div>
 
@@ -139,7 +151,7 @@ export default function VoiceUpload({ onVoiceAdded }) {
                     {isUploading && (
                         <div className="absolute inset-0 bg-white/80 dark:bg-slate-950/80 flex flex-col items-center justify-center rounded-xl z-10 backdrop-blur-sm">
                             <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
-                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Cloning Voice...</span>
+                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Processing Voice...</span>
                             <div className="w-2/3 mt-2">
                                 <ProgressBar value={uploadProgress} showLabel={false} height="h-1.5" />
                             </div>
@@ -152,7 +164,7 @@ export default function VoiceUpload({ onVoiceAdded }) {
                     disabled={!file || !personaName || isUploading}
                     className="w-full"
                 >
-                    {isUploading ? 'Cloning...' : 'Start Voice Cloning'}
+                    {isUploading ? 'Processing...' : 'Upload Voice Sample'}
                 </UIButton>
             </div>
         </UICard>

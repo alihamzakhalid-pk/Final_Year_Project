@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Search, Download, Settings, Upload, MessageSquare, Trash2, Brain, Volume2, Mic } from 'lucide-react'
 import ChatWindow from '../components/ChatWindow'
 import MessageInput from '../components/MessageInput'
+import MoodSelector from '../components/MoodSelector'
 import UICard from '../components/ui/Card'
 import UIButton from '../components/ui/Button'
 import SearchInput from '../components/ui/SearchInput'
@@ -50,6 +51,9 @@ export default function Chat() {
   // Voice Mode State — when ON, bot responses come as audio-only voice notes
   const [voiceMode, setVoiceMode] = useState(false)
 
+  // Mood State
+  const [currentMood, setCurrentMood] = useState('natural')
+
   const { showSuccess, showError } = useToast()
 
   // Update selected voice and persist
@@ -60,6 +64,25 @@ export default function Chat() {
     } else {
       localStorage.removeItem(`voice_for_chat_${chatId}`)
     }
+  }
+
+  // Fetch current mood for the chat
+  const fetchCurrentMood = async () => {
+    if (!chatId) return
+    try {
+      const response = await api.get(`/api/chat/${chatId}/mood`)
+      setCurrentMood(response.data.current_mood)
+    } catch (error) {
+      console.error('Failed to fetch current mood:', error)
+      // Default to natural if fetch fails
+      setCurrentMood('natural')
+    }
+  }
+
+  // Handle mood change
+  const handleMoodChange = (newMood, responseData) => {
+    setCurrentMood(newMood)
+    showSuccess(`Mood changed to ${responseData.mood_name} ${responseData.mood_emoji}`)
   }
 
   // Keyboard shortcut to toggle debug panel (Press 'D' key)
@@ -99,12 +122,15 @@ export default function Chat() {
       return
     }
 
+    let cancelled = false
+    let retryCount = 0
+
     // Reset voice selection when switching chats
     const savedVoiceId = localStorage.getItem(`voice_for_chat_${chatId}`)
     setSelectedVoiceId(savedVoiceId || null)
 
-    let cancelled = false
-    let retryCount = 0
+    // Fetch current mood
+    fetchCurrentMood()
     const maxRetries = 3
     const retryDelay = 1000
 
@@ -285,7 +311,10 @@ export default function Chat() {
     setError('')
 
     try {
-      const { data } = await api.post(`/api/chat/${chatId}/rag`, { message: trimmed })
+      const { data } = await api.post(`/api/chat/${chatId}/rag`, { 
+        message: trimmed,
+        mood: currentMood 
+      })
       const replyText = data?.response || `I'm having trouble responding right now, lekin main ${selectedPerson || 'bot'} jaldi reply karega.`
 
       // If Voice Mode is ON and a voice is selected, auto-generate TTS
@@ -584,7 +613,13 @@ export default function Chat() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* Mood Selector */}
+            <MoodSelector
+              chatId={chatId}
+              currentMood={currentMood}
+              onMoodChange={handleMoodChange}
+            />
 
             {/* Voice Settings Button */}
             <Tooltip content={selectedVoiceId ? 'Voice Active' : 'Select Voice'}>
